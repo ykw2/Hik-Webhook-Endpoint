@@ -44,7 +44,7 @@ from app.hik import (
     full_text,
     heartbeat_device,
     is_heartbeat_signal,
-    is_ignored_event,
+    quiet_label,
     parse_dt,
     parse_payload,
     state_label,
@@ -86,17 +86,12 @@ QUEUE_LABELS = {
     "queued": "排隊中",
     "sent": "已推送",
     "failed": "推送失敗",
+    "kept": "已收錄",
 }
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    removed = 0
-    for image in db.purge_heartbeats():
-        remove_image(image)
-        removed += 1
-    if removed:
-        log.info("已清掉 %s 筆心跳附帶圖片", removed)
     ready = "已設定" if cloudflare_url() else "未設定，事件只會排隊"
     log.info("Cloudflare 推送：%s", ready)
     stop = threading.Event()
@@ -174,8 +169,10 @@ def view_event(row: dict) -> dict:
     sent = parse_dt(row.get("sent_at") or "")
     status = row.get("queue_status") or "queued"
     code = row.get("event_type") or ""
-    access = door_info(row.get("raw_body") or "")
-    label = access["open_method"] or type_label(code)
+    raw = row.get("raw_body") or ""
+    access = door_info(raw)
+    quiet = quiet_label(code, raw)
+    label = access["open_method"] or quiet or type_label(code)
     return {
         "id": row["id"],
         "clock": clock_text(received),
@@ -183,8 +180,8 @@ def view_event(row: dict) -> dict:
         "received": full_text(received),
         "happened": full_text(happened) if happened else happened_raw,
         "type_label": label,
-        "type_code": "" if access["open_method"] else code,
-        "open_method": access["open_method"],
+        "type_code": "" if access["open_method"] or quiet else code,
+        "open_method": access["open_method"] or quiet,
         "person_name": access["person_name"],
         "employee_no": access["employee_no"],
         "door_no": access["door_no"],
@@ -269,10 +266,9 @@ async def webhook(request: Request):
 
     content_type = request.headers.get("content-type", "")
     parsed = parse_payload(content_type, body)
-    if is_ignored_event(parsed.event_type, parsed.raw_text):
-        device = None
-        if is_heartbeat_signal(parsed.event_type, parsed.raw_text):
-            device = heartbeat_device(parsed.raw_text, client_ip(request))
+    quiet = quiet_label(parsed.event_type, parsed.raw_text)
+    if is_heartbeat_signal(parsed.event_type, parsed.raw_text):
+        device = heartbeat_device(parsed.raw_text, client_ip(request))
         if device:
             try:
                 db.upsert_device(
@@ -285,7 +281,6 @@ async def webhook(request: Request):
                 log.exception("記錄心跳失敗")
                 return PlainTextResponse("error", status_code=500)
             log.info("心跳 %s %s", device["name"] or device["ip"], device["ip"])
-        return PlainTextResponse("ok")
     access = door_info(parsed.raw_text)
     try:
         event_id = db.insert_event(
@@ -300,7 +295,8 @@ async def webhook(request: Request):
             content_type=content_type[:200],
             raw_body=parsed.raw_text,
             person_name=access["person_name"],
-            open_method=access["open_method"],
+            open_method=quiet or access["open_method"],
+            hidden=1 if quiet else 0,
         )
         if parsed.images:
             ext, blob = parsed.images[0]
@@ -317,7 +313,7 @@ async def webhook(request: Request):
     log.info(
         "收到事件 %s type=%s channel=%s from=%s",
         event_id,
-        access["open_method"] or parsed.event_type or "-",
+        quiet or access["open_method"] or parsed.event_type or "-",
         parsed.channel_id or "-",
         client_ip(request),
     )
@@ -435,7 +431,7 @@ def live(request: Request):
             "ok": True,
             "devices": view_devices(),
             "stats": numbers,
-            "latest_id": db.latest_event_id(),
+            "latest_id": db.latest_event_id(request.query_params.get("q", "").strip()[:100]),
             "stale_seconds": HEARTBEAT_STALE_SECONDS,
         }
     )
@@ -451,7 +447,7 @@ def events(request: Request):
         "events.html",
         **event_list_args(request),
         devices=view_devices(),
-        latest_id=db.latest_event_id(),
+        latest_id=db.latest_event_id(request.query_params.get("q", "").strip()[:100]),
         stale_seconds=HEARTBEAT_STALE_SECONDS,
         webhook_url=str(request.base_url).rstrip("/") + "/",
     )

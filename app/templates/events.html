@@ -21,7 +21,7 @@
   <div class="device-grid" id="device-grid">
     {% if devices %}
     {% for device in devices %}
-    <article class="device {{ 'online' if device.online else 'offline' }}">
+    <article class="device {{ 'online' if device.online else 'offline' }}" data-id="{{ device.id }}" data-seen="{{ device.last_seen }}">
       <span class="status-icon" role="img" aria-label="{{ device.status_label }}">
         {% if device.online %}
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.2 16.2 5.4 12.4l1.4-1.4 2.4 2.4 6.9-6.9 1.4 1.4z"/></svg>
@@ -30,9 +30,8 @@
         {% endif %}
       </span>
       <div class="device-copy">
-        <strong>{{ device.name }}</strong>
-        <small>{{ device.ip or "未知 IP" }}{% if device.mac %} · {{ device.mac }}{% endif %}</small>
-        <small>{{ device.status_label }}{% if device.last_seen %} · {{ device.last_seen }}{% endif %}</small>
+        <strong>{{ device.ip or "未知 IP" }}</strong>
+        <small>{{ device.status_label }}</small>
       </div>
       {% if not device.online %}
       <form method="post" action="/devices/{{ device.id }}/remove">
@@ -73,9 +72,10 @@
 
 <form class="filters" method="get" action="/events">
   <input type="hidden" name="status" value="{{ status }}">
-  <input type="search" name="q" value="{{ q }}" placeholder="搜尋姓名、開門方式、通道、IP" maxlength="100">
+  <input type="search" name="q" value="{{ q }}" placeholder="搜尋姓名、開門方式、心跳、門鎖、通道、IP" maxlength="100">
   <button class="btn" type="submit">搜尋</button>
 </form>
+<p class="hint">心跳、門鎖打開、門鎖關閉平常不列出。輸入關鍵字搜尋就可以找到。</p>
 
 <div id="feed" data-latest="{{ latest_id }}">
 {% include "events_feed.html" %}

@@ -138,17 +138,17 @@ h2 { margin: 0 0 0.25rem; font-size: 1.12rem; }
 }
 
 .device-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .device {
-  display: flex;
-  gap: 0.75rem;
+  display: inline-flex;
+  gap: 0.4rem;
   align-items: center;
-  border-radius: 14px;
-  padding: 0.8rem 0.85rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem 0.22rem 0.22rem;
   border: 1px solid var(--line);
   background: var(--surface);
 }
@@ -164,8 +164,8 @@ h2 { margin: 0 0 0.25rem; font-size: 1.12rem; }
 }
 
 .status-icon {
-  width: 44px;
-  height: 44px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -173,19 +173,20 @@ h2 { margin: 0 0 0.25rem; font-size: 1.12rem; }
   color: white;
 }
 
-.status-icon svg { width: 24px; height: 24px; }
+.status-icon svg { width: 15px; height: 15px; }
 
-.device.online .status-icon {
-  background: var(--green);
-  box-shadow: 0 0 0 6px rgba(18, 138, 69, 0.16);
-}
+.device.online .status-icon { background: var(--green); }
 
 .device.offline .status-icon { background: var(--accent); }
 
-.device-copy { min-width: 0; flex: 1; }
+.status-icon.beat { animation: jump 0.7s cubic-bezier(0.2, 1.5, 0.4, 1); }
+
+.device-copy { min-width: 0; line-height: 1.15; }
 .device-copy strong,
 .device-copy small { display: block; }
-.device-copy small { color: var(--muted); font-size: 0.82rem; }
+.device-copy strong { font-size: 0.78rem; font-weight: 700; }
+.device-copy small { color: var(--muted); font-size: 0.68rem; }
+.device .btn.small { padding: 0.15rem 0.4rem; font-size: 0.72rem; border-radius: 999px; }
 .device-empty { grid-column: 1 / -1; margin: 0; }
 
 .card {
@@ -342,8 +343,8 @@ button:hover,
   grid-template-columns: auto 1fr auto;
   gap: 0.85rem;
   align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: #e7f8ee;
+  border: 1px solid #c6ecd4;
   border-radius: 14px;
   box-shadow: var(--shadow);
   padding: 0.8rem 0.9rem;
@@ -476,6 +477,14 @@ summary { cursor: pointer; font-weight: 700; color: var(--ink); }
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba(18, 138, 69, 0.45); }
   100% { box-shadow: 0 0 0 8px rgba(18, 138, 69, 0); }
+}
+
+@keyframes jump {
+  0% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-12px) scale(1.35); }
+  45% { transform: translateY(0) scale(0.92); }
+  65% { transform: translateY(-6px) scale(1.12); }
+  100% { transform: translateY(0) scale(1); }
 }
 
 @media (max-width: 720px) {

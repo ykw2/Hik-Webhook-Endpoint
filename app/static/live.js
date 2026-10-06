@@ -6,6 +6,19 @@
   var csrf = (document.querySelector('meta[name="csrf"]') || {}).content || "";
   var latest = Number(feed.getAttribute("data-latest") || "0");
   var deviceSig = "";
+  var seen = {};
+
+  grid.querySelectorAll(".device").forEach(function (card) {
+    seen[card.getAttribute("data-id")] = card.getAttribute("data-seen") || "";
+  });
+
+  function bounce(deviceId) {
+    var icon = grid.querySelector('.device[data-id="' + deviceId + '"] .status-icon');
+    if (!icon) return;
+    icon.classList.remove("beat");
+    void icon.offsetWidth;
+    icon.classList.add("beat");
+  }
 
   function esc(value) {
     return String(value || "").replace(/[&<>"']/g, function (char) {
@@ -32,13 +45,12 @@
         return [device.id, device.online, device.name, device.ip, device.mac, device.status_label];
       })
     );
+    var firstPaint = deviceSig === "";
     if (sig === deviceSig) {
-      var cards = grid.querySelectorAll(".device");
-      devices.forEach(function (device, index) {
-        var lines = cards[index] && cards[index].querySelectorAll("small");
-        if (!lines || !lines[1]) return;
-        lines[1].textContent =
-          (device.status_label || "") + (device.last_seen ? " · " + device.last_seen : "");
+      devices.forEach(function (device) {
+        var previous = seen[device.id];
+        seen[device.id] = device.last_seen || "";
+        if (device.online && previous !== device.last_seen) bounce(device.id);
       });
       return;
     }
@@ -57,21 +69,25 @@
             '/remove"><input type="hidden" name="csrf" value="' +
             esc(csrf) +
             '"><button class="btn small danger" type="submit">移除</button></form>';
+        var jumped = !firstPaint && online && seen[device.id] !== (device.last_seen || "");
+        seen[device.id] = device.last_seen || "";
         return (
           '<article class="device ' +
           (online ? "online" : "offline") +
-          '"><span class="status-icon" role="img" aria-label="' +
+          '" data-id="' +
+          Number(device.id) +
+          '" data-seen="' +
+          esc(device.last_seen) +
+          '"><span class="status-icon' +
+          (jumped ? " beat" : "") +
+          '" role="img" aria-label="' +
           esc(device.status_label) +
           '">' +
           icon(online) +
           '</span><div class="device-copy"><strong>' +
-          esc(device.name) +
-          "</strong><small>" +
           esc(device.ip || "未知 IP") +
-          (device.mac ? " · " + esc(device.mac) : "") +
-          "</small><small>" +
+          "</strong><small>" +
           esc(device.status_label) +
-          (device.last_seen ? " · " + esc(device.last_seen) : "") +
           "</small></div>" +
           remove +
           "</article>"
@@ -83,7 +99,10 @@
   async function tick() {
     if (document.hidden) return;
     try {
-      var res = await fetch("/live", {
+      var liveUrl = new URL("/live", location.origin);
+      var currentQuery = new URL(location.href).searchParams.get("q");
+      if (currentQuery) liveUrl.searchParams.set("q", currentQuery);
+      var res = await fetch(liveUrl, {
         headers: { Accept: "application/json" },
         cache: "no-store",
       });

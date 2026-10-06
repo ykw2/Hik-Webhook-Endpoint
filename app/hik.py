@@ -106,9 +106,18 @@ def is_heartbeat_signal(event_type: str, raw_text: str) -> bool:
 
 
 def is_ignored_event(event_type: str, raw_text: str) -> bool:
+    return bool(quiet_label(event_type, raw_text))
+
+
+def quiet_label(event_type: str, raw_text: str) -> str:
     if is_heartbeat_signal(event_type, raw_text):
-        return True
-    return _sub_code(_access_fields(raw_text)) in LOCK_CODES
+        return "心跳"
+    code = _sub_code(_access_fields(raw_text))
+    if code == 21:
+        return "門鎖打開"
+    if code == 22:
+        return "門鎖關閉"
+    return ""
 
 
 def heartbeat_device(raw_text: str, source_ip: str) -> dict[str, str] | None:

@@ -62,7 +62,8 @@ def init() -> None:
                 queue_attempts INTEGER NOT NULL DEFAULT 0,
                 queue_error TEXT,
                 next_attempt_at TEXT,
-                sent_at TEXT
+                sent_at TEXT,
+                hidden INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -73,21 +74,43 @@ def init() -> None:
             "CREATE INDEX IF NOT EXISTS idx_events_queue ON events (queue_status, next_attempt_at)"
         )
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(events)")}
-        for name in ("person_name", "open_method"):
+        for name, kind in (("person_name", "TEXT"), ("open_method", "TEXT")):
             if name not in columns:
-                conn.execute(f"ALTER TABLE events ADD COLUMN {name} TEXT")
-        from app.hik import door_info
+                conn.execute(f"ALTER TABLE events ADD COLUMN {name} {kind}")
+        if "hidden" not in columns:
+            conn.execute("ALTER TABLE events ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
+        from app.hik import door_info, quiet_label
 
         pending = conn.execute(
             """
-            SELECT id, raw_body FROM events
-            WHERE lower(replace(IFNULL(event_type,''), '_', '')) = 'accesscontrollerevent'
-               OR IFNULL(open_method, '') != ''
-               OR IFNULL(raw_body, '') LIKE '%AccessControllerEvent%'
+            SELECT id, event_type, raw_body, queue_status FROM events
+            WHERE IFNULL(hidden, 0) = 0
+              AND (
+                lower(replace(IFNULL(event_type,''), '_', '')) = 'accesscontrollerevent'
+                OR lower(replace(IFNULL(event_type,''), '_', '')) = 'heartbeat'
+                OR IFNULL(open_method, '') != ''
+                OR IFNULL(raw_body, '') LIKE '%AccessControllerEvent%'
+                OR IFNULL(raw_body, '') LIKE '%heartBeat%'
+              )
             """
         ).fetchall()
         for pending_row in pending:
-            info = door_info(pending_row["raw_body"] or "")
+            raw = pending_row["raw_body"] or ""
+            quiet = quiet_label(pending_row["event_type"] or "", raw)
+            if quiet:
+                conn.execute(
+                    """
+                    UPDATE events
+                    SET hidden = 1,
+                        open_method = ?,
+                        queue_status = CASE WHEN queue_status = 'queued' THEN 'kept' ELSE queue_status END,
+                        next_attempt_at = CASE WHEN queue_status = 'queued' THEN NULL ELSE next_attempt_at END
+                    WHERE id = ?
+                    """,
+                    (quiet, pending_row["id"]),
+                )
+                continue
+            info = door_info(raw)
             conn.execute(
                 "UPDATE events SET open_method = ?, person_name = ? WHERE id = ?",
                 (info["open_method"], info["person_name"], pending_row["id"]),
@@ -127,13 +150,14 @@ def set_admin_hash(password_hash: str) -> None:
         )
 
 
-_NOT_HEARTBEAT = "lower(replace(IFNULL(event_type,''), '_', '')) != 'heartbeat'"
-_HEARTBEAT = "lower(replace(IFNULL(event_type,''), '_', '')) = 'heartbeat'"
+_VISIBLE = "IFNULL(hidden, 0) = 0"
 
 
 def _filters(query: str, status: str) -> tuple[str, list[object]]:
-    where: list[str] = [_NOT_HEARTBEAT]
+    where: list[str] = []
     params: list[object] = []
+    if not query:
+        where.append(_VISIBLE)
     if status in {"queued", "sent", "failed"}:
         where.append("queue_status = ?")
         params.append(status)
@@ -205,16 +229,18 @@ def insert_event(
     raw_body: str,
     person_name: str = "",
     open_method: str = "",
+    hidden: int = 0,
 ) -> int:
     received = now_iso()
+    queued = not hidden
     with connect() as conn:
         cur = conn.execute(
             """
             INSERT INTO events (
                 received_at, event_time, event_type, event_state, event_description,
                 channel_id, channel_name, device_ip, source_ip, content_type, raw_body,
-                person_name, open_method, queue_status, next_attempt_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)
+                person_name, open_method, queue_status, next_attempt_at, hidden
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 received,
@@ -230,7 +256,9 @@ def insert_event(
                 raw_body,
                 person_name,
                 open_method,
-                received,
+                "queued" if queued else "kept",
+                received if queued else None,
+                1 if hidden else 0,
             ),
         )
         return int(cur.lastrowid)
@@ -278,23 +306,6 @@ def requeue_event(event_id: int) -> bool:
         return cur.rowcount > 0
 
 
-def purge_heartbeats() -> list[str]:
-    from app.hik import is_ignored_event
-
-    with connect() as conn:
-        rows = conn.execute(
-            "SELECT id, event_type, raw_body, image_path FROM events"
-        ).fetchall()
-        paths: list[str] = []
-        for row in rows:
-            if not is_ignored_event(row["event_type"] or "", row["raw_body"] or ""):
-                continue
-            if row["image_path"]:
-                paths.append(row["image_path"])
-            conn.execute("DELETE FROM events WHERE id = ?", (row["id"],))
-    return paths
-
-
 def stats() -> dict[str, int]:
     day = datetime.now(HK).strftime("%Y-%m-%d")
     with connect() as conn:
@@ -307,7 +318,7 @@ def stats() -> dict[str, int]:
                 COALESCE(SUM(CASE WHEN queue_status = 'sent' THEN 1 ELSE 0 END), 0) AS sent,
                 COALESCE(SUM(CASE WHEN queue_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed
             FROM events
-            WHERE {_NOT_HEARTBEAT}
+            WHERE {_VISIBLE}
             """,
             (day + "%",),
         ).fetchone()
@@ -320,7 +331,7 @@ def due_events(limit: int = 5) -> list[dict]:
             f"""
             SELECT * FROM events
             WHERE queue_status = 'queued'
-              AND {_NOT_HEARTBEAT}
+              AND {_VISIBLE}
               AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
             ORDER BY id
             LIMIT ?
@@ -330,10 +341,11 @@ def due_events(limit: int = 5) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def latest_event_id() -> int:
+def latest_event_id(query: str = "") -> int:
+    clause, params = _filters(query, "")
     with connect() as conn:
         row = conn.execute(
-            f"SELECT MAX(id) AS n FROM events WHERE {_NOT_HEARTBEAT}"
+            f"SELECT MAX(id) AS n FROM events{clause}", params
         ).fetchone()
     return int(row["n"] or 0)
 
