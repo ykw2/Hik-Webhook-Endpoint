@@ -343,8 +343,8 @@ button:hover,
   grid-template-columns: auto 1fr auto;
   gap: 0.85rem;
   align-items: center;
-  background: #e7f8ee;
-  border: 1px solid #c6ecd4;
+  background: white;
+  border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow);
   padding: 0.8rem 0.9rem;
@@ -352,12 +352,13 @@ button:hover,
 }
 
 .plate {
-  background: var(--accent-soft);
-  color: var(--accent-dark);
+  background: #e7f8ee;
+  color: #0f7a3a;
   text-align: center;
   min-width: 6.6rem;
   padding: 0.45rem 0.6rem;
   border-radius: 12px;
+  border: 1px solid #c6ecd4;
 }
 
 .plate b {
@@ -366,7 +367,7 @@ button:hover,
   letter-spacing: 0.03em;
 }
 
-.plate small { color: var(--muted); font-size: 0.75rem; }
+.plate small { color: #3d8a5c; font-size: 0.75rem; }
 
 .event-main { display: flex; gap: 0.75rem; align-items: center; min-width: 0; }
 .thumb {

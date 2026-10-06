@@ -31,7 +31,7 @@
       </span>
       <div class="device-copy">
         <strong>{{ device.ip or "未知 IP" }}</strong>
-        <small>{{ device.status_label }}</small>
+        <small>{{ device.status_label }}{% if device.last_clock %} · <span class="seen">{{ device.last_clock }}</span>{% endif %}</small>
       </div>
       {% if not device.online %}
       <form method="post" action="/devices/{{ device.id }}/remove">

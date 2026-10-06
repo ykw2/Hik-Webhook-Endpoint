@@ -372,6 +372,10 @@ def view_devices() -> list[dict]:
     for row in db.list_devices():
         online = device_online(row.get("last_seen") or "")
         last = parse_dt(row.get("last_seen") or "")
+        day = day_text(last)
+        clock = clock_text(last) if last else ""
+        today = datetime.now(HK).strftime("%Y-%m-%d")
+        when = clock if not day or day == today else f"{day} {clock}"
         items.append(
             {
                 "id": row["id"],
@@ -379,6 +383,7 @@ def view_devices() -> list[dict]:
                 "ip": row.get("ip") or "",
                 "mac": row.get("mac") or "",
                 "last_seen": full_text(last),
+                "last_clock": when,
                 "online": online,
                 "status_label": "已連線" if online else "沒有心跳",
             }

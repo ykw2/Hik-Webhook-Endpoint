@@ -51,6 +51,10 @@
         var previous = seen[device.id];
         seen[device.id] = device.last_seen || "";
         if (device.online && previous !== device.last_seen) bounce(device.id);
+        var stamp = grid.querySelector('.device[data-id="' + device.id + '"] .seen');
+        if (stamp) stamp.textContent = device.last_clock || "";
+        var card = grid.querySelector('.device[data-id="' + device.id + '"]');
+        if (card) card.setAttribute("data-seen", device.last_seen || "");
       });
       return;
     }
@@ -88,6 +92,7 @@
           esc(device.ip || "未知 IP") +
           "</strong><small>" +
           esc(device.status_label) +
+          (device.last_clock ? ' · <span class="seen">' + esc(device.last_clock) + "</span>" : "") +
           "</small></div>" +
           remove +
           "</article>"
