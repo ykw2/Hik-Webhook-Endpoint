@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ event.type_label }} · 海康事件{% endblock %}
+{% block content %}
+{% if flash %}<p class="flash{% if flash_bad %} bad{% endif %}">{{ flash }}</p>{% endif %}
+<p><a href="/events">返回列表</a></p>
+<h1>{{ event.type_label }}</h1>
+<p>
+  <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
+  {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
+</p>
+
+<dl class="facts">
+  <div><dt>收到時間</dt><dd>{{ event.received or "—" }}</dd></div>
+  <div><dt>裝置時間</dt><dd>{{ event.happened or "—" }}</dd></div>
+  <div><dt>狀態</dt><dd>{{ event.state_label or "—" }}</dd></div>
+  <div><dt>通道</dt><dd>{{ event.channel_id or "—" }}{% if event.channel_name %} {{ event.channel_name }}{% endif %}</dd></div>
+  <div><dt>裝置 IP</dt><dd>{{ event.device_ip or "—" }}</dd></div>
+  <div><dt>來源位址</dt><dd>{{ event.source_ip or "—" }}</dd></div>
+  <div><dt>嘗試次數</dt><dd>{{ event.queue_attempts }}</dd></div>
+  <div><dt>送出時間</dt><dd>{{ event.sent or "—" }}</dd></div>
+</dl>
+
+{% if event.description %}<p>{{ event.description }}</p>{% endif %}
+
+{% if event.queue_status == "queued" and not cloudflare_ready %}
+<aside class="notice">尚未設定 Cloudflare 推送位置，這筆事件會留在隊列。</aside>
+{% endif %}
+{% if event.queue_error %}<p class="error">{{ event.queue_error }}</p>{% endif %}
+
+{% if event.has_image %}
+<h2>圖片</h2>
+<img class="shot" src="/events/{{ event.id }}/image" alt="事件圖片">
+{% endif %}
+
+<h2>原始內容</h2>
+{% if event.raw_body %}
+<pre class="raw">{{ event.raw_body }}</pre>
+{% else %}
+<p>沒有文字內容。</p>
+{% endif %}
+
+<div class="button-row">
+  {% if event.queue_status != "queued" %}
+  <form method="post" action="/events/{{ event.id }}/requeue">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit">重新排隊</button>
+  </form>
+  {% endif %}
+  <form method="post" action="/events/{{ event.id }}/delete" onsubmit="return confirm('刪除這個事件？');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="danger" type="submit">刪除</button>
+  </form>
+</div>
+{% endblock %}

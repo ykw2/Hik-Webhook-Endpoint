@@ -1,0 +1,31 @@
+# 首次啟動會產生登入密碼。
+# 請看 docker compose logs，或專案裡的 data/initial-password.txt。
+# Cloudflare 目的地未定前不要填下面兩個變數，事件只會排隊。
+
+name: hik-webhook
+
+services:
+  hik-webhook:
+    build: .
+    container_name: hik-webhook
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./data:/data
+    environment:
+      DATA_DIR: /data
+      # CLOUDFLARE_PUSH_URL: https://example.workers.dev/hik
+      # CLOUDFLARE_PUSH_TOKEN: ""
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}事件 · 海康接收{% endblock %}
+{% block content %}
+{% if flash %}<p class="flash{% if flash_bad %} bad{% endif %}">{{ flash }}</p>{% endif %}
+<div class="page-head">
+  <h1>收到的事件</h1>
+  {% if stats.total %}
+  <form method="post" action="/events/clear" onsubmit="return confirm('清除全部事件？這個動作不能還原。');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="danger" type="submit">清除全部</button>
+  </form>
+  {% endif %}
+</div>
+
+<section class="stats">
+  <article><b>{{ stats.today }}</b><span>今日收到</span></article>
+  <article><b>{{ stats.queued }}</b><span>排隊中</span></article>
+  <article><b>{{ stats.sent }}</b><span>已推送</span></article>
+  <article><b>{{ stats.failed }}</b><span>推送失敗</span></article>
+</section>
+
+{% if not cloudflare_ready %}
+<aside class="notice">Cloudflare 推送位置尚未設定。新事件會保持排隊，不會送出。日後在 docker-compose.yml 填上 CLOUDFLARE_PUSH_URL，重新啟動後就會開始推送。</aside>
+{% endif %}
+
+<div class="endpoint">
+  <div>接收地址 <code>{{ webhook_url }}</code></div>
+  <p class="hint">這個網頁要登入。接收地址不用登入，否則海康送不進事件。攝影機請用它連得到的主機位址，路徑是 /webhook。</p>
+</div>
+
+<nav class="tabs">
+  <a class="{% if not status %}on{% endif %}" href="/events?q={{ q|urlencode }}">全部</a>
+  <a class="{% if status == 'queued' %}on{% endif %}" href="/events?status=queued&q={{ q|urlencode }}">排隊中</a>
+  <a class="{% if status == 'sent' %}on{% endif %}" href="/events?status=sent&q={{ q|urlencode }}">已推送</a>
+  <a class="{% if status == 'failed' %}on{% endif %}" href="/events?status=failed&q={{ q|urlencode }}">推送失敗</a>
+</nav>
+
+<form class="filters" method="get" action="/events">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="搜尋通道、類型、IP" maxlength="100">
+  <button class="btn" type="submit">搜尋</button>
+</form>
+
+{% if empty == "none" %}
+<div class="empty">
+  <p>未有事件。</p>
+  <p>請把海康的 HTTP 主機通知指向上面的接收地址。</p>
+</div>
+{% elif empty == "filter" %}
+<div class="empty"><p>沒有符合的事件。</p></div>
+{% else %}
+<p>共 {{ total }} 筆</p>
+{% for event in events %}
+<article class="event">
+  <div class="plate">
+    <b>{{ event.clock }}</b>
+    <small>{{ event.day }}</small>
+  </div>
+  <div>
+    <strong class="type">{{ event.type_label }}</strong>
+    {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
+    <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
+    {% if event.has_image %}<span class="pic">有圖片</span>{% endif %}
+    <p class="meta">
+      {% if event.channel_id %}通道 {{ event.channel_id }}{% endif %}
+      {% if event.channel_name %}{% if event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
+      {% if event.state_label %}{% if event.channel_id or event.channel_name %} · {% endif %}{{ event.state_label }}{% endif %}
+      {% if event.device_ip %}{% if event.channel_id or event.channel_name or event.state_label %} · {% endif %}{{ event.device_ip }}{% endif %}
+    </p>
+    {% if event.description %}<p class="desc">{{ event.description }}</p>{% endif %}
+  </div>
+  <div class="actions">
+    <a class="btn small" href="/events/{{ event.id }}">查看</a>
+    <form method="post" action="/events/{{ event.id }}/delete" onsubmit="return confirm('刪除這個事件？');">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn small danger" type="submit">刪除</button>
+    </form>
+  </div>
+</article>
+{% endfor %}
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="/events?page={{ page - 1 }}&status={{ status }}&q={{ q|urlencode }}">上一頁</a>{% endif %}
+  <span>{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="/events?page={{ page + 1 }}&status={{ status }}&q={{ q|urlencode }}">下一頁</a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}
