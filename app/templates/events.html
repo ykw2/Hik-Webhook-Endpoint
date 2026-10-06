@@ -16,7 +16,7 @@
 <section class="panel" id="devices">
   <div class="panel-head">
     <h2>裝置連線</h2>
-    <p>收到心跳會自動加入，綠色代表已連線。超過 {{ stale_seconds }} 秒沒有心跳會變紅，紅色可以手動移除。</p>
+    <p>收到心跳會自動加入，綠色代表已連線。超過 {{ stale_seconds }} 秒沒有連線會變紅，紅色可以手動移除。</p>
   </div>
   <div class="device-grid" id="device-grid">
     {% if devices %}

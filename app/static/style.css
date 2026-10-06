@@ -352,22 +352,24 @@ button:hover,
 }
 
 .plate {
-  background: #e7f8ee;
-  color: #0f7a3a;
+  background: #e7f0fb;
+  color: #1d4ed8;
   text-align: center;
-  min-width: 6.6rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: 12px;
-  border: 1px solid #c6ecd4;
+  min-width: 5.8rem;
+  padding: 0.72rem 0.85rem 0.62rem;
+  border-radius: 16px;
+  border: 0;
 }
 
 .plate b {
   display: block;
-  font-size: 1.12rem;
-  letter-spacing: 0.03em;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.15;
 }
 
-.plate small { color: #3d8a5c; font-size: 0.75rem; }
+.plate small { display: block; margin-top: 0.12rem; color: #8b95a7; font-size: 0.95rem; font-weight: 500; }
 
 .event-main { display: flex; gap: 0.75rem; align-items: center; min-width: 0; }
 .thumb {

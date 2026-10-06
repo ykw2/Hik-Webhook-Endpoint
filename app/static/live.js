@@ -118,6 +118,7 @@
       if (!res.ok) return;
       var data = await res.json();
       renderDevices(data.devices || []);
+      refreshAgo();
       ["today", "queued", "sent", "failed"].forEach(function (key) {
         var node = document.getElementById("stat-" + key);
         if (node && data.stats) node.textContent = data.stats[key];
@@ -141,6 +142,29 @@
     } catch (err) {
       return;
     }
+  }
+
+  function refreshAgo() {
+    document.querySelectorAll(".plate[data-at]").forEach(function (plate) {
+      var then = new Date(plate.getAttribute("data-at"));
+      if (isNaN(then.getTime())) return;
+      var seconds = Math.floor((Date.now() - then.getTime()) / 1000);
+      var label = "剛剛";
+      if (seconds >= 60) {
+        var minutes = Math.floor(seconds / 60);
+        if (minutes < 60) label = minutes + "分鐘";
+        else {
+          var hours = Math.floor(minutes / 60);
+          if (hours < 24) label = hours + "小時";
+          else {
+            var days = Math.floor(hours / 24);
+            label = days === 1 ? "昨天" : days < 30 ? days + "日" : "";
+          }
+        }
+      }
+      var node = plate.querySelector(".ago");
+      if (label && node && node.textContent !== label) node.textContent = label;
+    });
   }
 
   setInterval(tick, 2000);

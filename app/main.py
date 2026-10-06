@@ -38,6 +38,7 @@ from app.config import (
     cloudflare_url,
 )
 from app.hik import (
+    ago_text,
     clock_text,
     day_text,
     door_info,
@@ -45,6 +46,7 @@ from app.hik import (
     heartbeat_device,
     is_heartbeat_signal,
     quiet_label,
+    short_clock,
     parse_dt,
     parse_payload,
     state_label,
@@ -74,7 +76,7 @@ FLASH = {
     "requeued": "已重新排隊。",
     "csrf": "頁面已過期，請再試一次。",
     "missing": "找不到這個事件。",
-    "removed": "已移除沒有心跳的裝置。",
+    "removed": "已移除沒有連線的裝置。",
     "online": "這部裝置仍有心跳，不能移除。",
 }
 BAD_FLASH = {"short", "long", "mismatch", "wrong", "csrf", "missing", "online"}
@@ -176,6 +178,9 @@ def view_event(row: dict) -> dict:
     return {
         "id": row["id"],
         "clock": clock_text(received),
+        "clock_short": short_clock(received),
+        "ago": ago_text(received),
+        "received_iso": received.isoformat() if received else "",
         "day": day_text(received),
         "received": full_text(received),
         "happened": full_text(happened) if happened else happened_raw,
@@ -385,7 +390,7 @@ def view_devices() -> list[dict]:
                 "last_seen": full_text(last),
                 "last_clock": when,
                 "online": online,
-                "status_label": "已連線" if online else "沒有心跳",
+                "status_label": "已連線" if online else "沒有連線",
             }
         )
     items.sort(key=lambda item: (not item["online"], item["name"]))

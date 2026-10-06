@@ -237,6 +237,30 @@ def clock_text(value: datetime | None) -> str:
     return value.strftime("%H:%M:%S") if value else "--:--:--"
 
 
+def short_clock(value: datetime | None) -> str:
+    return value.strftime("%H:%M") if value else "--:--"
+
+
+def ago_text(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    seconds = int((datetime.now(HK) - value).total_seconds())
+    if seconds < 60:
+        return "剛剛"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}分鐘"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}小時"
+    days = hours // 24
+    if days == 1:
+        return "昨天"
+    if days < 30:
+        return f"{days}日"
+    return day_text(value)
+
+
 def day_text(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d") if value else ""
 
