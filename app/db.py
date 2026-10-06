@@ -81,8 +81,9 @@ def init() -> None:
         pending = conn.execute(
             """
             SELECT id, raw_body FROM events
-            WHERE open_method IS NULL
-              AND lower(replace(IFNULL(event_type,''), '_', '')) = 'accesscontrollerevent'
+            WHERE lower(replace(IFNULL(event_type,''), '_', '')) = 'accesscontrollerevent'
+               OR IFNULL(open_method, '') != ''
+               OR IFNULL(raw_body, '') LIKE '%AccessControllerEvent%'
             """
         ).fetchall()
         for pending_row in pending:
@@ -265,12 +266,20 @@ def requeue_event(event_id: int) -> bool:
 
 
 def purge_heartbeats() -> list[str]:
+    from app.hik import is_ignored_event
+
     with connect() as conn:
         rows = conn.execute(
-            f"SELECT image_path FROM events WHERE {_HEARTBEAT} AND image_path IS NOT NULL"
+            "SELECT id, event_type, raw_body, image_path FROM events"
         ).fetchall()
-        conn.execute(f"DELETE FROM events WHERE {_HEARTBEAT}")
-    return [row["image_path"] for row in rows if row["image_path"]]
+        paths: list[str] = []
+        for row in rows:
+            if not is_ignored_event(row["event_type"] or "", row["raw_body"] or ""):
+                continue
+            if row["image_path"]:
+                paths.append(row["image_path"])
+            conn.execute("DELETE FROM events WHERE id = ?", (row["id"],))
+    return paths
 
 
 def stats() -> dict[str, int]:

@@ -32,7 +32,7 @@ from app.hik import (
     day_text,
     door_info,
     full_text,
-    is_heartbeat,
+    is_ignored_event,
     parse_dt,
     parse_payload,
     state_label,
@@ -175,6 +175,7 @@ def view_event(row: dict) -> dict:
         "employee_no": access["employee_no"],
         "door_no": access["door_no"],
         "card_no": access["card_no"],
+        "device_name": access["device_name"],
         "state_label": state_label(row.get("event_state") or ""),
         "description": row.get("event_description") or "",
         "channel_id": row.get("channel_id") or "",
@@ -254,7 +255,7 @@ async def webhook(request: Request):
 
     content_type = request.headers.get("content-type", "")
     parsed = parse_payload(content_type, body)
-    if is_heartbeat(parsed.event_type):
+    if is_ignored_event(parsed.event_type, parsed.raw_text):
         return PlainTextResponse("ok")
     access = door_info(parsed.raw_text)
     try:

@@ -19,6 +19,7 @@
   {% if event.employee_no %}<div><dt>工號</dt><dd>{{ event.employee_no }}</dd></div>{% endif %}
   {% if event.door_no %}<div><dt>門</dt><dd>{{ event.door_no }}</dd></div>{% endif %}
   {% if event.card_no %}<div><dt>卡號</dt><dd>{{ event.card_no }}</dd></div>{% endif %}
+  {% if event.device_name %}<div><dt>裝置</dt><dd>{{ event.device_name }}</dd></div>{% endif %}
   <div><dt>收到時間</dt><dd>{{ event.received or "—" }}</dd></div>
   <div><dt>裝置時間</dt><dd>{{ event.happened or "—" }}</dd></div>
   <div><dt>狀態</dt><dd>{{ event.state_label or "—" }}</dd></div>

@@ -87,116 +87,51 @@ def state_label(state: str) -> str:
     return STATE_LABELS.get(state.lower(), state)
 
 
+FACE_CODES = {75, 38, 76, 112, 113}
+CARD_CODES = {1, 39, 16, 17}
+FINGER_CODES = {2, 3, 18}
+HEARTBEAT_MINOR = 77
+
+
 def is_heartbeat(event_type: str) -> bool:
     return event_type.lower().replace("_", "") == "heartbeat"
 
 
-# 海康門禁 majorEventType=5 的 subEventType。開門方式以實際認證結果為準。
-_SUB_EVENT_LABELS = {
-    1: "刷卡開門",
-    2: "刷卡加密碼開門",
-    3: "刷卡加密碼失敗",
-    4: "刷卡加密碼超時",
-    6: "未分配權限",
-    7: "卡不在有效期",
-    8: "卡已過期",
-    9: "無此卡號",
-    16: "多重認證開門",
-    21: "門鎖打開",
-    22: "門鎖關閉",
-    23: "開門按鈕",
-    25: "門打開",
-    26: "門關閉",
-    27: "門異常打開",
-    28: "門打開超時",
-    36: "多重認證超時",
-    38: "指紋開門",
-    39: "指紋比對失敗",
-    40: "刷卡加指紋開門",
-    41: "刷卡加指紋失敗",
-    43: "刷卡加指紋加密碼開門",
-    46: "指紋加密碼開門",
-    50: "平台認證開門",
-    54: "人臉加指紋開門",
-    55: "人臉加指紋失敗",
-    57: "人臉加密碼開門",
-    58: "人臉加密碼失敗",
-    60: "人臉加刷卡開門",
-    61: "人臉加刷卡失敗",
-    63: "人臉加密碼加指紋開門",
-    66: "人臉加刷卡加指紋開門",
-    69: "工號加指紋開門",
-    72: "工號加指紋加密碼開門",
-    75: "人臉開門",
-    76: "人臉認證失敗",
-    77: "工號加人臉開門",
-    78: "工號加人臉失敗",
-    80: "人臉識別失敗",
-    101: "密碼開門",
-    102: "密碼認證失敗",
-    104: "真人檢測失敗",
-    105: "人證比對開門",
-    106: "人證比對失敗",
-}
-
-_VERIFY_LABELS = {
-    "card": "刷卡開門",
-    "pw": "密碼開門",
-    "password": "密碼開門",
-    "cardandpw": "刷卡加密碼開門",
-    "cardorpw": "刷卡或密碼開門",
-    "fp": "指紋開門",
-    "fingerprint": "指紋開門",
-    "fpandpw": "指紋加密碼開門",
-    "fporcard": "指紋或刷卡開門",
-    "fpandcard": "指紋加刷卡開門",
-    "fpandcardandpw": "指紋加刷卡加密碼開門",
-    "face": "人臉開門",
-    "faceandfp": "人臉加指紋開門",
-    "faceandpw": "人臉加密碼開門",
-    "faceandcard": "人臉加刷卡開門",
-    "faceorfp": "人臉或指紋開門",
-    "faceorcard": "人臉或刷卡開門",
-    "cardorface": "刷卡或人臉開門",
-    "faceandfpandcard": "人臉加指紋加刷卡開門",
-    "faceandpwandfp": "人臉加密碼加指紋開門",
-    "faceorfp orcard": "人臉、指紋或刷卡開門",
-    "faceorfp orcardorpw": "人臉、指紋、刷卡或密碼開門",
-    "employeenoandpw": "工號加密碼開門",
-    "employeenoandfp": "工號加指紋開門",
-    "employeenoandface": "工號加人臉開門",
-    "employeenoandfpandpw": "工號加指紋加密碼開門",
-    "employeenoandfaceandpw": "工號加人臉加密碼開門",
-    "remoteopen": "遠程開門",
-    "button": "開門按鈕",
-}
-
-# 只表示門鎖狀態，沒有說明用什麼認證。有認證模式時改用認證模式。
-_GENERIC_SUB_EVENTS = {21, 22, 25, 26}
+def is_ignored_event(event_type: str, raw_text: str) -> bool:
+    fields = _access_fields(raw_text)
+    if is_heartbeat(event_type) or is_heartbeat(_pick(fields, "eventType")):
+        return True
+    return _sub_code(fields) == HEARTBEAT_MINOR
 
 
 def door_info(raw_text: str) -> dict[str, str]:
-    empty = {"open_method": "", "person_name": "", "employee_no": "", "door_no": "", "card_no": ""}
+    empty = {
+        "open_method": "",
+        "person_name": "",
+        "employee_no": "",
+        "door_no": "",
+        "card_no": "",
+        "device_name": "",
+    }
     if not raw_text.strip():
         return empty
-    fields = _fields_from_text(raw_text)
-    if not _is_access(fields):
+    fields = _access_fields(raw_text)
+    if not _is_access(fields) or is_heartbeat(_pick(fields, "eventType")):
         return empty
-    sub_code = _sub_code(fields)
-    verify = _verify_label(_pick(fields, "currentVerifyMode", "verifyMode", "currentVerifyModeString"))
-    method = ""
-    if sub_code in _SUB_EVENT_LABELS and sub_code not in _GENERIC_SUB_EVENTS:
-        method = _SUB_EVENT_LABELS[sub_code]
-    elif verify:
-        method = verify
-    elif sub_code in _SUB_EVENT_LABELS:
-        method = _SUB_EVENT_LABELS[sub_code]
+    if _sub_code(fields) == HEARTBEAT_MINOR:
+        return empty
+    person = _clip(_pick(fields, "name", "personName", "employeeName"), 80)
+    employee = _clip(_pick(fields, "employeeNoString", "employeeNo", "employeeNoStr"), 40)
+    card = _clip(_pick(fields, "cardNo", "cardNumber"), 40)
+    if not person and (employee or card):
+        person = "未知人員"
     return {
-        "open_method": method,
-        "person_name": _clip(_pick(fields, "name", "personName", "employeeName"), 80),
-        "employee_no": _clip(_pick(fields, "employeeNoString", "employeeNo", "employeeNoStr"), 40),
-        "door_no": _clip(_pick(fields, "doorNo", "doorID", "doorId"), 20),
-        "card_no": _clip(_pick(fields, "cardNo", "cardNumber"), 40),
+        "open_method": _verification_label(fields),
+        "person_name": person,
+        "employee_no": employee,
+        "door_no": _clip(_pick(fields, "doorNo", "devNo", "doorID", "doorId"), 20),
+        "card_no": card,
+        "device_name": _clip(_pick(fields, "deviceName", "device_name"), 80),
     }
 
 
@@ -219,11 +154,23 @@ def _sub_code(fields: dict[str, str]) -> int | None:
         return None
 
 
-def _verify_label(mode: str) -> str:
-    if not mode:
-        return ""
-    key = re.sub(r"[\s_\-]", "", mode).lower()
-    return _VERIFY_LABELS.get(key, "")
+def _verification_label(fields: dict[str, str]) -> str:
+    code = _sub_code(fields)
+    if code in FACE_CODES:
+        return "人臉辨識通行"
+    if code in CARD_CODES:
+        return "刷卡通行"
+    if code in FINGER_CODES:
+        return "指紋辨識通行"
+    description = _pick(fields, "eventDescription", "label", "minorEventDesc").lower()
+    if "face" in description or "人臉" in description or "人脸" in description:
+        return "人臉辨識通行"
+    if "card" in description or "刷卡" in description:
+        return "刷卡通行"
+    if "finger" in description or "指紋" in description or "指纹" in description:
+        return "指紋辨識通行"
+    shown = code if code is not None else "未知"
+    return f"門禁驗證 (代碼:{shown})"
 
 
 def parse_dt(value: str | None) -> datetime | None:
@@ -286,10 +233,15 @@ def parse_payload(content_type: str, body: bytes) -> ParsedEvent:
         else:
             text = _decode(body)
 
+    preview = _fields_from_text(text)
+    if not _pick(preview, "eventType", "event_type") and _sub_code(preview) is None:
+        embedded = _best_event_json(text) or _best_event_json(_decode(body))
+        if embedded:
+            text = embedded
     if len(text) > RAW_LIMIT:
         text = text[:RAW_LIMIT] + "\n\n…（內容已截斷）"
 
-    fields = _fields_from_text(text)
+    fields = _access_fields(text)
     return ParsedEvent(
         event_type=_clip(_pick(fields, "eventType", "event_type"), 120),
         event_state=_clip(_pick(fields, "eventState", "event_state"), 40),
@@ -400,14 +352,66 @@ def _fields_from_text(text: str) -> dict[str, str]:
     return {}
 
 
+def _access_fields(raw_text: str) -> dict[str, str]:
+    fields = _fields_from_text(raw_text)
+    if _pick(fields, "eventType", "event_type") or _sub_code(fields) is not None:
+        return fields
+    blob = _best_event_json(raw_text)
+    if not blob:
+        return fields
+    return _fields_from_text(blob) or fields
+
+
+def _best_event_json(text: str) -> str:
+    if not text or "{" not in text:
+        return ""
+    chosen = ""
+    for chunk in _extract_json_objects(text):
+        try:
+            obj = json.loads(chunk)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if "AccessControllerEvent" in obj or "eventType" in obj:
+            return chunk
+        if not chosen:
+            chosen = chunk
+    return chosen
+
+
+def _extract_json_objects(text: str) -> list[str]:
+    results: list[str] = []
+    open_brackets = 0
+    start = -1
+    limit = min(len(text), 2_000_000)
+    for index in range(limit):
+        char = text[index]
+        if char == "{":
+            if open_brackets == 0:
+                start = index
+            open_brackets += 1
+            if open_brackets > 80 or (start >= 0 and index - start > 400_000):
+                open_brackets = 0
+                start = -1
+        elif char == "}" and open_brackets:
+            open_brackets -= 1
+            if open_brackets == 0 and start != -1:
+                results.append(text[start : index + 1])
+                start = -1
+                if len(results) >= 20:
+                    break
+    return results
+
+
 def _walk_json(payload: object, found: dict[str, str]) -> None:
     if isinstance(payload, dict):
         nested: list[object] = []
         for key, value in payload.items():
             if isinstance(value, (dict, list)):
                 nested.append(value)
-            elif value is not None and key not in found:
-                found[key] = str(value)
+            elif value is not None and key not in found and str(value).strip():
+                found[key] = str(value).strip()
         for value in nested:
             _walk_json(value, found)
     elif isinstance(payload, list):

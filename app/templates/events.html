@@ -69,9 +69,10 @@
         {% if event.employee_no %}{% if event.person_name %} · {% endif %}工號 {{ event.employee_no }}{% endif %}
         {% if event.door_no %}{% if event.person_name or event.employee_no %} · {% endif %}門 {{ event.door_no }}{% endif %}
         {% if event.card_no %}{% if event.person_name or event.employee_no or event.door_no %} · {% endif %}卡 {{ event.card_no }}{% endif %}
-        {% if event.channel_id %}{% if event.person_name or event.employee_no or event.door_no or event.card_no %} · {% endif %}通道 {{ event.channel_id }}{% endif %}
-        {% if event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
-        {% if event.device_ip %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.channel_id or event.channel_name %} · {% endif %}{{ event.device_ip }}{% endif %}
+        {% if event.device_name and event.device_name != event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no %} · {% endif %}{{ event.device_name }}{% endif %}
+        {% if event.channel_id %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name %} · {% endif %}通道 {{ event.channel_id }}{% endif %}
+        {% if event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name or event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
+        {% if event.device_ip %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name or event.channel_id or event.channel_name %} · {% endif %}{{ event.device_ip }}{% endif %}
       </p>
       {% if event.description %}<p class="desc">{{ event.description }}</p>{% endif %}
     </div>
