@@ -274,6 +274,11 @@ async def webhook(request: Request):
     return PlainTextResponse("ok")
 
 
+@app.api_route("/", methods=["POST", "PUT"])
+async def root_webhook(request: Request):
+    return await webhook(request)
+
+
 @app.get("/")
 def home(request: Request):
     if request.session.get("auth"):

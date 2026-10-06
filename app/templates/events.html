@@ -25,7 +25,7 @@
 
 <div class="endpoint">
   <div>接收地址 <code>{{ webhook_url }}</code></div>
-  <p class="hint">這個網頁要登入。接收地址不用登入，否則海康送不進事件。攝影機請用它連得到的主機位址，路徑是 /webhook。</p>
+  <p class="hint">這個網頁的 GET 要登入。海康的 POST 打到這個位址根路徑，或後面加上 /webhook，都不用登入。</p>
 </div>
 
 <nav class="tabs">
