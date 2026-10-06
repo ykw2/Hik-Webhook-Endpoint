@@ -91,17 +91,24 @@ FACE_CODES = {75, 38, 76, 112, 113}
 CARD_CODES = {1, 39, 16, 17}
 FINGER_CODES = {2, 3, 18}
 HEARTBEAT_MINOR = 77
+LOCK_CODES = {21, 22}
 
 
 def is_heartbeat(event_type: str) -> bool:
     return event_type.lower().replace("_", "") == "heartbeat"
 
 
-def is_ignored_event(event_type: str, raw_text: str) -> bool:
+def is_heartbeat_signal(event_type: str, raw_text: str) -> bool:
     fields = _access_fields(raw_text)
     if is_heartbeat(event_type) or is_heartbeat(_pick(fields, "eventType")):
         return True
     return _sub_code(fields) == HEARTBEAT_MINOR
+
+
+def is_ignored_event(event_type: str, raw_text: str) -> bool:
+    if is_heartbeat_signal(event_type, raw_text):
+        return True
+    return _sub_code(_access_fields(raw_text)) in LOCK_CODES
 
 
 def heartbeat_device(raw_text: str, source_ip: str) -> dict[str, str] | None:
@@ -142,7 +149,7 @@ def door_info(raw_text: str) -> dict[str, str]:
     fields = _access_fields(raw_text)
     if not _is_access(fields) or is_heartbeat(_pick(fields, "eventType")):
         return empty
-    if _sub_code(fields) == HEARTBEAT_MINOR:
+    if _sub_code(fields) in {HEARTBEAT_MINOR, *LOCK_CODES}:
         return empty
     person = _clip(_pick(fields, "name", "personName", "employeeName"), 80)
     employee = _clip(_pick(fields, "employeeNoString", "employeeNo", "employeeNoStr"), 40)

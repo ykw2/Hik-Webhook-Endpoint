@@ -43,6 +43,7 @@ from app.hik import (
     door_info,
     full_text,
     heartbeat_device,
+    is_heartbeat_signal,
     is_ignored_event,
     parse_dt,
     parse_payload,
@@ -269,7 +270,9 @@ async def webhook(request: Request):
     content_type = request.headers.get("content-type", "")
     parsed = parse_payload(content_type, body)
     if is_ignored_event(parsed.event_type, parsed.raw_text):
-        device = heartbeat_device(parsed.raw_text, client_ip(request))
+        device = None
+        if is_heartbeat_signal(parsed.event_type, parsed.raw_text):
+            device = heartbeat_device(parsed.raw_text, client_ip(request))
         if device:
             try:
                 db.upsert_device(
