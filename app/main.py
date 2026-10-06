@@ -38,19 +38,18 @@ from app.config import (
     cloudflare_url,
 )
 from app.hik import (
-    ago_text,
     clock_text,
     day_text,
     door_info,
     full_text,
     heartbeat_device,
     is_heartbeat_signal,
-    quiet_label,
-    short_clock,
     parse_dt,
     parse_payload,
+    quiet_label,
     state_label,
     type_label,
+    weekday_text,
 )
 from app.worker import run_worker
 
@@ -178,9 +177,7 @@ def view_event(row: dict) -> dict:
     return {
         "id": row["id"],
         "clock": clock_text(received),
-        "clock_short": short_clock(received),
-        "ago": ago_text(received),
-        "received_iso": received.isoformat() if received else "",
+        "weekday": weekday_text(received),
         "day": day_text(received),
         "received": full_text(received),
         "happened": full_text(happened) if happened else happened_raw,

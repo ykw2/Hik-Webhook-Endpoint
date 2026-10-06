@@ -241,6 +241,12 @@ def short_clock(value: datetime | None) -> str:
     return value.strftime("%H:%M") if value else "--:--"
 
 
+def weekday_text(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    return "星期" + "一二三四五六日"[value.weekday()]
+
+
 def ago_text(value: datetime | None) -> str:
     if value is None:
         return ""

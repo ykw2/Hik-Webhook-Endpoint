@@ -9,9 +9,9 @@
 <p class="count">共 {{ total }} 筆</p>
 {% for event in events %}
 <article class="event">
-  <div class="plate" data-at="{{ event.received_iso }}">
-    <b class="ago">{{ event.ago or event.clock_short }}</b>
-    <small>{{ event.clock_short }}</small>
+  <div class="plate">
+    <b>{{ event.clock }}</b>
+    <small>{{ event.weekday }}</small>
   </div>
   <div class="event-main">
     {% if event.has_image %}
