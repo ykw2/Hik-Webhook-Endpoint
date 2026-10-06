@@ -1,0 +1,53 @@
+{% if empty == "none" %}
+<div class="empty">
+  <p>未有事件。</p>
+  <p>請把海康的 HTTP 主機通知指向上面的接收地址。</p>
+</div>
+{% elif empty == "filter" %}
+<div class="empty"><p>沒有符合的事件。</p></div>
+{% else %}
+<p class="count">共 {{ total }} 筆</p>
+{% for event in events %}
+<article class="event">
+  <div class="plate">
+    <b>{{ event.clock }}</b>
+    <small>{{ event.day }}</small>
+  </div>
+  <div class="event-main">
+    {% if event.has_image %}
+    <a href="/events/{{ event.id }}"><img class="thumb" src="/events/{{ event.id }}/image" alt="人臉圖片"></a>
+    {% endif %}
+    <div>
+      <strong class="type">{{ event.type_label }}</strong>
+      {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
+      <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
+      <p class="meta">
+        {% if event.person_name %}{{ event.person_name }}{% endif %}
+        {% if event.employee_no %}{% if event.person_name %} · {% endif %}工號 {{ event.employee_no }}{% endif %}
+        {% if event.door_no %}{% if event.person_name or event.employee_no %} · {% endif %}門 {{ event.door_no }}{% endif %}
+        {% if event.card_no %}{% if event.person_name or event.employee_no or event.door_no %} · {% endif %}卡 {{ event.card_no }}{% endif %}
+        {% if event.device_name and event.device_name != event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no %} · {% endif %}{{ event.device_name }}{% endif %}
+        {% if event.channel_id %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name %} · {% endif %}通道 {{ event.channel_id }}{% endif %}
+        {% if event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name or event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
+        {% if event.device_ip %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name or event.channel_id or event.channel_name %} · {% endif %}{{ event.device_ip }}{% endif %}
+      </p>
+      {% if event.description %}<p class="desc">{{ event.description }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="actions">
+    <a class="btn small" href="/events/{{ event.id }}">查看</a>
+    <form method="post" action="/events/{{ event.id }}/delete" onsubmit="return confirm('刪除這個事件？');">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn small danger" type="submit">刪除</button>
+    </form>
+  </div>
+</article>
+{% endfor %}
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="/events?page={{ page - 1 }}&status={{ status }}&q={{ q|urlencode }}">上一頁</a>{% endif %}
+  <span>{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="/events?page={{ page + 1 }}&status={{ status }}&q={{ q|urlencode }}">下一頁</a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}

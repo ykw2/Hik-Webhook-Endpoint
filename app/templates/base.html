@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}海康事件{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
+  {% if authed %}<meta name="csrf" content="{{ csrf }}">{% endif %}
 </head>
 <body>
   <header class="top">
@@ -31,5 +32,6 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

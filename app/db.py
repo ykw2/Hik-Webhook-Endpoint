@@ -92,6 +92,19 @@ def init() -> None:
                 "UPDATE events SET open_method = ?, person_name = ? WHERE id = ?",
                 (info["open_method"], info["person_name"], pending_row["id"]),
             )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_key TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                ip TEXT,
+                mac TEXT,
+                last_seen TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
 
 def admin_hash() -> str | None:
@@ -304,7 +317,7 @@ def stats() -> dict[str, int]:
 def due_events(limit: int = 5) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT * FROM events
             WHERE queue_status = 'queued'
               AND {_NOT_HEARTBEAT}
@@ -315,6 +328,57 @@ def due_events(limit: int = 5) -> list[dict]:
             (now_iso(), limit),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def latest_event_id() -> int:
+    with connect() as conn:
+        row = conn.execute(
+            f"SELECT MAX(id) AS n FROM events WHERE {_NOT_HEARTBEAT}"
+        ).fetchone()
+    return int(row["n"] or 0)
+
+
+def upsert_device(device_key: str, name: str, ip: str, mac: str) -> None:
+    stamp = now_iso()
+    display = name or (f"裝置 {ip}" if ip else "未知裝置")
+    with connect() as conn:
+        if ip and device_key != f"ip:{ip}":
+            conn.execute(
+                "DELETE FROM devices WHERE device_key = ? AND device_key != ?",
+                (f"ip:{ip}", device_key),
+            )
+        conn.execute(
+            """
+            INSERT INTO devices (device_key, name, ip, mac, last_seen, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(device_key) DO UPDATE SET
+                name = CASE WHEN ? != '' THEN ? ELSE devices.name END,
+                ip = CASE WHEN excluded.ip != '' THEN excluded.ip ELSE devices.ip END,
+                mac = CASE WHEN excluded.mac != '' THEN excluded.mac ELSE devices.mac END,
+                last_seen = excluded.last_seen
+            """,
+            (device_key, display, ip, mac, stamp, stamp, name, name),
+        )
+
+
+def list_devices() -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM devices ORDER BY last_seen DESC, id DESC"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_device(device_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_device(device_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        return cur.rowcount > 0
 
 
 def mark_sent(event_id: int) -> None:

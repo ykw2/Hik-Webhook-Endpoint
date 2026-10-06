@@ -104,6 +104,30 @@ def is_ignored_event(event_type: str, raw_text: str) -> bool:
     return _sub_code(fields) == HEARTBEAT_MINOR
 
 
+def heartbeat_device(raw_text: str, source_ip: str) -> dict[str, str] | None:
+    fields = _access_fields(raw_text)
+    mac = _normalize_mac(_pick(fields, "macAddress", "mac"))
+    serial = _clip(_pick(fields, "shortSerialNumber", "serialNumber", "deviceID"), 80)
+    ip = _clip(_pick(fields, "ipAddress", "ip", "deviceIP") or source_ip, 80)
+    name = _clip(_pick(fields, "deviceName", "channelName", "device_name"), 80)
+    if mac:
+        key = "mac:" + mac
+    elif serial:
+        key = "sn:" + serial
+    elif ip:
+        key = "ip:" + ip
+    else:
+        return None
+    return {"device_key": key, "name": name, "ip": ip, "mac": mac}
+
+
+def _normalize_mac(value: str) -> str:
+    raw = re.sub(r"[^0-9a-fA-F]", "", value)
+    if len(raw) != 12:
+        return ""
+    return ":".join(raw[index : index + 2] for index in range(0, 12, 2)).lower()
+
+
 def door_info(raw_text: str) -> dict[str, str]:
     empty = {
         "open_method": "",

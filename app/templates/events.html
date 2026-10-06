@@ -3,20 +3,56 @@
 {% block content %}
 {% if flash %}<p class="flash{% if flash_bad %} bad{% endif %}">{{ flash }}</p>{% endif %}
 <div class="page-head">
-  <h1>收到的事件</h1>
-  {% if stats.total %}
-  <form method="post" action="/events/clear" onsubmit="return confirm('清除全部事件？這個動作不能還原。');">
+  <div>
+    <h1>收到的事件</h1>
+    <p class="live-pill"><i></i>即時更新</p>
+  </div>
+  <form id="clear-events" method="post" action="/events/clear" onsubmit="return confirm('清除全部事件？這個動作不能還原。');"{% if not stats.total %} hidden{% endif %}>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="danger" type="submit">清除全部</button>
   </form>
-  {% endif %}
 </div>
 
+<section class="panel" id="devices">
+  <div class="panel-head">
+    <h2>裝置連線</h2>
+    <p>收到心跳會自動加入，綠色代表已連線。超過 {{ stale_seconds }} 秒沒有心跳會變紅，紅色可以手動移除。</p>
+  </div>
+  <div class="device-grid" id="device-grid">
+    {% if devices %}
+    {% for device in devices %}
+    <article class="device {{ 'online' if device.online else 'offline' }}">
+      <span class="status-icon" role="img" aria-label="{{ device.status_label }}">
+        {% if device.online %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.2 16.2 5.4 12.4l1.4-1.4 2.4 2.4 6.9-6.9 1.4 1.4z"/></svg>
+        {% else %}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 11h10v2H7z"/></svg>
+        {% endif %}
+      </span>
+      <div class="device-copy">
+        <strong>{{ device.name }}</strong>
+        <small>{{ device.ip or "未知 IP" }}{% if device.mac %} · {{ device.mac }}{% endif %}</small>
+        <small>{{ device.status_label }}{% if device.last_seen %} · {{ device.last_seen }}{% endif %}</small>
+      </div>
+      {% if not device.online %}
+      <form method="post" action="/devices/{{ device.id }}/remove">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn small danger" type="submit">移除</button>
+      </form>
+      {% endif %}
+    </article>
+    {% endfor %}
+    {% else %}
+    <p class="empty device-empty">未收到任何裝置心跳。</p>
+    {% endif %}
+  </div>
+</section>
+
 <section class="stats">
-  <article><b>{{ stats.today }}</b><span>今日收到</span></article>
-  <article><b>{{ stats.queued }}</b><span>排隊中</span></article>
-  <article><b>{{ stats.sent }}</b><span>已推送</span></article>
-  <article><b>{{ stats.failed }}</b><span>推送失敗</span></article>
+  <article><b id="stat-today">{{ stats.today }}</b><span>今日收到</span></article>
+  <article><b id="stat-queued">{{ stats.queued }}</b><span>排隊中</span></article>
+  <article><b id="stat-sent">{{ stats.sent }}</b><span>已推送</span></article>
+  <article><b id="stat-failed">{{ stats.failed }}</b><span>推送失敗</span></article>
 </section>
 
 {% if not cloudflare_ready %}
@@ -41,57 +77,10 @@
   <button class="btn" type="submit">搜尋</button>
 </form>
 
-{% if empty == "none" %}
-<div class="empty">
-  <p>未有事件。</p>
-  <p>請把海康的 HTTP 主機通知指向上面的接收地址。</p>
+<div id="feed" data-latest="{{ latest_id }}">
+{% include "events_feed.html" %}
 </div>
-{% elif empty == "filter" %}
-<div class="empty"><p>沒有符合的事件。</p></div>
-{% else %}
-<p>共 {{ total }} 筆</p>
-{% for event in events %}
-<article class="event">
-  <div class="plate">
-    <b>{{ event.clock }}</b>
-    <small>{{ event.day }}</small>
-  </div>
-  <div class="event-main">
-    {% if event.has_image %}
-    <a href="/events/{{ event.id }}"><img class="thumb" src="/events/{{ event.id }}/image" alt="人臉圖片"></a>
-    {% endif %}
-    <div>
-      <strong class="type">{{ event.type_label }}</strong>
-      {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
-      <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
-      <p class="meta">
-        {% if event.person_name %}{{ event.person_name }}{% endif %}
-        {% if event.employee_no %}{% if event.person_name %} · {% endif %}工號 {{ event.employee_no }}{% endif %}
-        {% if event.door_no %}{% if event.person_name or event.employee_no %} · {% endif %}門 {{ event.door_no }}{% endif %}
-        {% if event.card_no %}{% if event.person_name or event.employee_no or event.door_no %} · {% endif %}卡 {{ event.card_no }}{% endif %}
-        {% if event.device_name and event.device_name != event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no %} · {% endif %}{{ event.device_name }}{% endif %}
-        {% if event.channel_id %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name %} · {% endif %}通道 {{ event.channel_id }}{% endif %}
-        {% if event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name or event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
-        {% if event.device_ip %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.device_name or event.channel_id or event.channel_name %} · {% endif %}{{ event.device_ip }}{% endif %}
-      </p>
-      {% if event.description %}<p class="desc">{{ event.description }}</p>{% endif %}
-    </div>
-  </div>
-  <div class="actions">
-    <a class="btn small" href="/events/{{ event.id }}">查看</a>
-    <form method="post" action="/events/{{ event.id }}/delete" onsubmit="return confirm('刪除這個事件？');">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="btn small danger" type="submit">刪除</button>
-    </form>
-  </div>
-</article>
-{% endfor %}
-{% if pages > 1 %}
-<nav class="pager">
-  {% if page > 1 %}<a href="/events?page={{ page - 1 }}&status={{ status }}&q={{ q|urlencode }}">上一頁</a>{% endif %}
-  <span>{{ page }} / {{ pages }}</span>
-  {% if page < pages %}<a href="/events?page={{ page + 1 }}&status={{ status }}&q={{ q|urlencode }}">下一頁</a>{% endif %}
-</nav>
-{% endif %}
-{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/live.js"></script>
 {% endblock %}

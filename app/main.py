@@ -5,11 +5,12 @@ import math
 import secrets
 import threading
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -26,12 +27,22 @@ from app.auth import (
     too_many,
     verify_password,
 )
-from app.config import DATA_DIR, IMAGE_DIR, MAX_BODY, MAX_IMAGE, PAGE_SIZE, cloudflare_url
+from app.config import (
+    DATA_DIR,
+    HEARTBEAT_STALE_SECONDS,
+    HK,
+    IMAGE_DIR,
+    MAX_BODY,
+    MAX_IMAGE,
+    PAGE_SIZE,
+    cloudflare_url,
+)
 from app.hik import (
     clock_text,
     day_text,
     door_info,
     full_text,
+    heartbeat_device,
     is_ignored_event,
     parse_dt,
     parse_payload,
@@ -62,8 +73,10 @@ FLASH = {
     "requeued": "已重新排隊。",
     "csrf": "頁面已過期，請再試一次。",
     "missing": "找不到這個事件。",
+    "removed": "已移除沒有心跳的裝置。",
+    "online": "這部裝置仍有心跳，不能移除。",
 }
-BAD_FLASH = {"short", "long", "mismatch", "wrong", "csrf", "missing"}
+BAD_FLASH = {"short", "long", "mismatch", "wrong", "csrf", "missing", "online"}
 LOGIN_ERRORS = {
     "bad": "密碼不正確。",
     "locked": "嘗試次數太多，請約 1 分鐘後再試。",
@@ -256,6 +269,19 @@ async def webhook(request: Request):
     content_type = request.headers.get("content-type", "")
     parsed = parse_payload(content_type, body)
     if is_ignored_event(parsed.event_type, parsed.raw_text):
+        device = heartbeat_device(parsed.raw_text, client_ip(request))
+        if device:
+            try:
+                db.upsert_device(
+                    device["device_key"],
+                    device["name"],
+                    device["ip"],
+                    device["mac"],
+                )
+            except Exception:
+                log.exception("記錄心跳失敗")
+                return PlainTextResponse("error", status_code=500)
+            log.info("心跳 %s %s", device["name"] or device["ip"], device["ip"])
         return PlainTextResponse("ok")
     access = door_info(parsed.raw_text)
     try:
@@ -335,11 +361,34 @@ async def logout(request: Request):
     return RedirectResponse("/", status_code=303)
 
 
-@app.get("/events")
-def events(request: Request):
-    denied = guard(request)
-    if denied:
-        return denied
+def device_online(last_seen: str) -> bool:
+    last = parse_dt(last_seen)
+    if last is None:
+        return False
+    return (datetime.now(HK) - last).total_seconds() <= HEARTBEAT_STALE_SECONDS
+
+
+def view_devices() -> list[dict]:
+    items = []
+    for row in db.list_devices():
+        online = device_online(row.get("last_seen") or "")
+        last = parse_dt(row.get("last_seen") or "")
+        items.append(
+            {
+                "id": row["id"],
+                "name": row.get("name") or row.get("ip") or "未知裝置",
+                "ip": row.get("ip") or "",
+                "mac": row.get("mac") or "",
+                "last_seen": full_text(last),
+                "online": online,
+                "status_label": "已連線" if online else "沒有心跳",
+            }
+        )
+    items.sort(key=lambda item: (not item["online"], item["name"]))
+    return items
+
+
+def event_list_args(request: Request) -> dict:
     query = request.query_params.get("q", "").strip()[:100]
     status = request.query_params.get("status", "")
     if status not in {"queued", "sent", "failed"}:
@@ -361,19 +410,73 @@ def events(request: Request):
         empty = "filter"
     else:
         empty = ""
+    return {
+        "events": rows,
+        "stats": numbers,
+        "total": total,
+        "page": page,
+        "pages": pages,
+        "q": query,
+        "status": status,
+        "empty": empty,
+    }
+
+
+@app.get("/live")
+def live(request: Request):
+    if not request.session.get("auth"):
+        return JSONResponse({"ok": False}, status_code=401)
+    numbers = db.stats()
+    return JSONResponse(
+        {
+            "ok": True,
+            "devices": view_devices(),
+            "stats": numbers,
+            "latest_id": db.latest_event_id(),
+            "stale_seconds": HEARTBEAT_STALE_SECONDS,
+        }
+    )
+
+
+@app.get("/events")
+def events(request: Request):
+    denied = guard(request)
+    if denied:
+        return denied
     return render(
         request,
         "events.html",
-        events=rows,
-        stats=numbers,
-        total=total,
-        page=page,
-        pages=pages,
-        q=query,
-        status=status,
-        empty=empty,
-        webhook_url=str(request.base_url).rstrip("/") + "/webhook",
+        **event_list_args(request),
+        devices=view_devices(),
+        latest_id=db.latest_event_id(),
+        stale_seconds=HEARTBEAT_STALE_SECONDS,
+        webhook_url=str(request.base_url).rstrip("/") + "/",
     )
+
+
+@app.get("/events/feed")
+def events_feed(request: Request):
+    denied = guard(request)
+    if denied:
+        return denied
+    return render(request, "events_feed.html", **event_list_args(request))
+
+
+@app.post("/devices/{device_id}/remove")
+async def device_remove(request: Request, device_id: int):
+    denied = guard(request)
+    if denied:
+        return denied
+    form = await form_values(request)
+    if not csrf_ok(request, form.get("csrf", "")):
+        return RedirectResponse("/events?m=csrf", status_code=303)
+    row = db.get_device(device_id)
+    if row is None:
+        return RedirectResponse("/events", status_code=303)
+    if device_online(row.get("last_seen") or ""):
+        return RedirectResponse("/events?m=online", status_code=303)
+    db.delete_device(device_id)
+    return RedirectResponse("/events?m=removed", status_code=303)
 
 
 @app.get("/events/{event_id}")
