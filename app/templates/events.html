@@ -2,16 +2,6 @@
 {% block title %}事件 · 海康接收{% endblock %}
 {% block content %}
 {% if flash %}<p class="flash{% if flash_bad %} bad{% endif %}">{{ flash }}</p>{% endif %}
-<div class="page-head">
-  <div>
-    <h1>收到的事件</h1>
-    <p class="live-pill"><i></i>即時更新</p>
-  </div>
-  <form id="clear-events" method="post" action="/events/clear" onsubmit="return confirm('清除全部事件？這個動作不能還原。');"{% if not stats.total %} hidden{% endif %}>
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button class="danger" type="submit">清除全部</button>
-  </form>
-</div>
 
 <section class="panel" id="devices">
   <div class="panel-head">
@@ -53,15 +43,6 @@
   <article><b id="stat-sent">{{ stats.sent }}</b><span>已推送</span></article>
   <article><b id="stat-failed">{{ stats.failed }}</b><span>推送失敗</span></article>
 </section>
-
-{% if not cloudflare_ready %}
-<aside class="notice">Cloudflare 推送位置尚未設定。新事件會保持排隊，不會送出。日後在 docker-compose.yml 填上 CLOUDFLARE_PUSH_URL，重新啟動後就會開始推送。</aside>
-{% endif %}
-
-<div class="endpoint">
-  <div>接收地址 <code>{{ webhook_url }}</code></div>
-  <p class="hint">這個網頁的 GET 要登入。海康的 POST 打到這個位址根路徑，或後面加上 /webhook，都不用登入。</p>
-</div>
 
 <nav class="tabs">
   <a class="{% if not status %}on{% endif %}" href="/events?q={{ q|urlencode }}">全部</a>
