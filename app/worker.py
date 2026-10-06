@@ -8,6 +8,7 @@ import urllib.request
 
 from app.config import cloudflare_token, cloudflare_url
 from app import db
+from app.hik import door_info
 
 log = logging.getLogger("hik.queue")
 
@@ -59,6 +60,7 @@ def _push(url: str, token: str, row: dict) -> None:
         "source_ip": row["source_ip"],
         "has_image": bool(row["image_path"]),
         "raw": (row["raw_body"] or "")[:100_000],
+        **door_info(row.get("raw_body") or ""),
     }
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(url, data=data, method="POST")

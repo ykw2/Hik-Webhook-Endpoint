@@ -30,7 +30,9 @@ from app.config import DATA_DIR, IMAGE_DIR, MAX_BODY, MAX_IMAGE, PAGE_SIZE, clou
 from app.hik import (
     clock_text,
     day_text,
+    door_info,
     full_text,
+    is_heartbeat,
     parse_dt,
     parse_payload,
     state_label,
@@ -75,6 +77,12 @@ QUEUE_LABELS = {
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    removed = 0
+    for image in db.purge_heartbeats():
+        remove_image(image)
+        removed += 1
+    if removed:
+        log.info("已清掉 %s 筆心跳附帶圖片", removed)
     ready = "已設定" if cloudflare_url() else "未設定，事件只會排隊"
     log.info("Cloudflare 推送：%s", ready)
     stop = threading.Event()
@@ -152,14 +160,21 @@ def view_event(row: dict) -> dict:
     sent = parse_dt(row.get("sent_at") or "")
     status = row.get("queue_status") or "queued"
     code = row.get("event_type") or ""
+    access = door_info(row.get("raw_body") or "")
+    label = access["open_method"] or type_label(code)
     return {
         "id": row["id"],
         "clock": clock_text(received),
         "day": day_text(received),
         "received": full_text(received),
         "happened": full_text(happened) if happened else happened_raw,
-        "type_label": type_label(code),
-        "type_code": code,
+        "type_label": label,
+        "type_code": "" if access["open_method"] else code,
+        "open_method": access["open_method"],
+        "person_name": access["person_name"],
+        "employee_no": access["employee_no"],
+        "door_no": access["door_no"],
+        "card_no": access["card_no"],
         "state_label": state_label(row.get("event_state") or ""),
         "description": row.get("event_description") or "",
         "channel_id": row.get("channel_id") or "",
@@ -239,6 +254,9 @@ async def webhook(request: Request):
 
     content_type = request.headers.get("content-type", "")
     parsed = parse_payload(content_type, body)
+    if is_heartbeat(parsed.event_type):
+        return PlainTextResponse("ok")
+    access = door_info(parsed.raw_text)
     try:
         event_id = db.insert_event(
             event_time=parsed.event_time,
@@ -251,6 +269,8 @@ async def webhook(request: Request):
             source_ip=client_ip(request)[:80],
             content_type=content_type[:200],
             raw_body=parsed.raw_text,
+            person_name=access["person_name"],
+            open_method=access["open_method"],
         )
         if parsed.images:
             ext, blob = parsed.images[0]
@@ -267,7 +287,7 @@ async def webhook(request: Request):
     log.info(
         "收到事件 %s type=%s channel=%s from=%s",
         event_id,
-        parsed.event_type or "-",
+        access["open_method"] or parsed.event_type or "-",
         parsed.channel_id or "-",
         client_ip(request),
     )

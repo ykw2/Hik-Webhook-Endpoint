@@ -258,6 +258,16 @@ button:hover,
 
 .plate small { color: white; font-size: 0.75rem; }
 
+.event-main { display: flex; gap: 0.75rem; align-items: center; min-width: 0; }
+.thumb {
+  width: 64px;
+  height: 80px;
+  object-fit: cover;
+  border: 2px solid #111;
+  background: #111;
+  flex: 0 0 auto;
+}
+.shot.face { display: block; max-height: 360px; width: auto; margin: 0 0 0.9rem; }
 .type { font-size: 1.15rem; }
 .meta { margin: 0.15rem 0 0; color: #444; }
 .desc { margin: 0.2rem 0 0; }

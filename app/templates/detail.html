@@ -9,7 +9,16 @@
   {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
 </p>
 
+{% if event.has_image %}
+<img class="shot face" src="/events/{{ event.id }}/image" alt="人臉圖片">
+{% endif %}
+
 <dl class="facts">
+  {% if event.open_method %}<div><dt>開門方式</dt><dd>{{ event.open_method }}</dd></div>{% endif %}
+  {% if event.person_name %}<div><dt>姓名</dt><dd>{{ event.person_name }}</dd></div>{% endif %}
+  {% if event.employee_no %}<div><dt>工號</dt><dd>{{ event.employee_no }}</dd></div>{% endif %}
+  {% if event.door_no %}<div><dt>門</dt><dd>{{ event.door_no }}</dd></div>{% endif %}
+  {% if event.card_no %}<div><dt>卡號</dt><dd>{{ event.card_no }}</dd></div>{% endif %}
   <div><dt>收到時間</dt><dd>{{ event.received or "—" }}</dd></div>
   <div><dt>裝置時間</dt><dd>{{ event.happened or "—" }}</dd></div>
   <div><dt>狀態</dt><dd>{{ event.state_label or "—" }}</dd></div>
@@ -26,11 +35,6 @@
 <aside class="notice">尚未設定 Cloudflare 推送位置，這筆事件會留在隊列。</aside>
 {% endif %}
 {% if event.queue_error %}<p class="error">{{ event.queue_error }}</p>{% endif %}
-
-{% if event.has_image %}
-<h2>圖片</h2>
-<img class="shot" src="/events/{{ event.id }}/image" alt="事件圖片">
-{% endif %}
 
 <h2>原始內容</h2>
 {% if event.raw_body %}

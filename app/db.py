@@ -72,6 +72,25 @@ def init() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_queue ON events (queue_status, next_attempt_at)"
         )
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(events)")}
+        for name in ("person_name", "open_method"):
+            if name not in columns:
+                conn.execute(f"ALTER TABLE events ADD COLUMN {name} TEXT")
+        from app.hik import door_info
+
+        pending = conn.execute(
+            """
+            SELECT id, raw_body FROM events
+            WHERE open_method IS NULL
+              AND lower(replace(IFNULL(event_type,''), '_', '')) = 'accesscontrollerevent'
+            """
+        ).fetchall()
+        for pending_row in pending:
+            info = door_info(pending_row["raw_body"] or "")
+            conn.execute(
+                "UPDATE events SET open_method = ?, person_name = ? WHERE id = ?",
+                (info["open_method"], info["person_name"], pending_row["id"]),
+            )
 
 
 def admin_hash() -> str | None:
@@ -94,8 +113,12 @@ def set_admin_hash(password_hash: str) -> None:
         )
 
 
+_NOT_HEARTBEAT = "lower(replace(IFNULL(event_type,''), '_', '')) != 'heartbeat'"
+_HEARTBEAT = "lower(replace(IFNULL(event_type,''), '_', '')) = 'heartbeat'"
+
+
 def _filters(query: str, status: str) -> tuple[str, list[object]]:
-    where: list[str] = []
+    where: list[str] = [_NOT_HEARTBEAT]
     params: list[object] = []
     if status in {"queued", "sent", "failed"}:
         where.append("queue_status = ?")
@@ -113,11 +136,14 @@ def _filters(query: str, status: str) -> tuple[str, list[object]]:
                     "IFNULL(channel_name,'') LIKE ? ESCAPE '\\'",
                     "IFNULL(device_ip,'') LIKE ? ESCAPE '\\'",
                     "IFNULL(source_ip,'') LIKE ? ESCAPE '\\'",
+                    "IFNULL(raw_body,'') LIKE ? ESCAPE '\\'",
+                    "IFNULL(person_name,'') LIKE ? ESCAPE '\\'",
+                    "IFNULL(open_method,'') LIKE ? ESCAPE '\\'",
                 ]
             )
             + ")"
         )
-        params.extend([pattern] * 7)
+        params.extend([pattern] * 10)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     return clause, params
 
@@ -163,6 +189,8 @@ def insert_event(
     source_ip: str,
     content_type: str,
     raw_body: str,
+    person_name: str = "",
+    open_method: str = "",
 ) -> int:
     received = now_iso()
     with connect() as conn:
@@ -171,8 +199,8 @@ def insert_event(
             INSERT INTO events (
                 received_at, event_time, event_type, event_state, event_description,
                 channel_id, channel_name, device_ip, source_ip, content_type, raw_body,
-                queue_status, next_attempt_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)
+                person_name, open_method, queue_status, next_attempt_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)
             """,
             (
                 received,
@@ -186,6 +214,8 @@ def insert_event(
                 source_ip,
                 content_type,
                 raw_body,
+                person_name,
+                open_method,
                 received,
             ),
         )
@@ -234,11 +264,20 @@ def requeue_event(event_id: int) -> bool:
         return cur.rowcount > 0
 
 
+def purge_heartbeats() -> list[str]:
+    with connect() as conn:
+        rows = conn.execute(
+            f"SELECT image_path FROM events WHERE {_HEARTBEAT} AND image_path IS NOT NULL"
+        ).fetchall()
+        conn.execute(f"DELETE FROM events WHERE {_HEARTBEAT}")
+    return [row["image_path"] for row in rows if row["image_path"]]
+
+
 def stats() -> dict[str, int]:
     day = datetime.now(HK).strftime("%Y-%m-%d")
     with connect() as conn:
         row = conn.execute(
-            """
+            f"""
             SELECT
                 COUNT(*) AS total,
                 COALESCE(SUM(CASE WHEN received_at LIKE ? THEN 1 ELSE 0 END), 0) AS today,
@@ -246,6 +285,7 @@ def stats() -> dict[str, int]:
                 COALESCE(SUM(CASE WHEN queue_status = 'sent' THEN 1 ELSE 0 END), 0) AS sent,
                 COALESCE(SUM(CASE WHEN queue_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed
             FROM events
+            WHERE {_NOT_HEARTBEAT}
             """,
             (day + "%",),
         ).fetchone()
@@ -258,6 +298,7 @@ def due_events(limit: int = 5) -> list[dict]:
             """
             SELECT * FROM events
             WHERE queue_status = 'queued'
+              AND {_NOT_HEARTBEAT}
               AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
             ORDER BY id
             LIMIT ?

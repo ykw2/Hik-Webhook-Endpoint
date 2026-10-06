@@ -87,6 +87,145 @@ def state_label(state: str) -> str:
     return STATE_LABELS.get(state.lower(), state)
 
 
+def is_heartbeat(event_type: str) -> bool:
+    return event_type.lower().replace("_", "") == "heartbeat"
+
+
+# 海康門禁 majorEventType=5 的 subEventType。開門方式以實際認證結果為準。
+_SUB_EVENT_LABELS = {
+    1: "刷卡開門",
+    2: "刷卡加密碼開門",
+    3: "刷卡加密碼失敗",
+    4: "刷卡加密碼超時",
+    6: "未分配權限",
+    7: "卡不在有效期",
+    8: "卡已過期",
+    9: "無此卡號",
+    16: "多重認證開門",
+    21: "門鎖打開",
+    22: "門鎖關閉",
+    23: "開門按鈕",
+    25: "門打開",
+    26: "門關閉",
+    27: "門異常打開",
+    28: "門打開超時",
+    36: "多重認證超時",
+    38: "指紋開門",
+    39: "指紋比對失敗",
+    40: "刷卡加指紋開門",
+    41: "刷卡加指紋失敗",
+    43: "刷卡加指紋加密碼開門",
+    46: "指紋加密碼開門",
+    50: "平台認證開門",
+    54: "人臉加指紋開門",
+    55: "人臉加指紋失敗",
+    57: "人臉加密碼開門",
+    58: "人臉加密碼失敗",
+    60: "人臉加刷卡開門",
+    61: "人臉加刷卡失敗",
+    63: "人臉加密碼加指紋開門",
+    66: "人臉加刷卡加指紋開門",
+    69: "工號加指紋開門",
+    72: "工號加指紋加密碼開門",
+    75: "人臉開門",
+    76: "人臉認證失敗",
+    77: "工號加人臉開門",
+    78: "工號加人臉失敗",
+    80: "人臉識別失敗",
+    101: "密碼開門",
+    102: "密碼認證失敗",
+    104: "真人檢測失敗",
+    105: "人證比對開門",
+    106: "人證比對失敗",
+}
+
+_VERIFY_LABELS = {
+    "card": "刷卡開門",
+    "pw": "密碼開門",
+    "password": "密碼開門",
+    "cardandpw": "刷卡加密碼開門",
+    "cardorpw": "刷卡或密碼開門",
+    "fp": "指紋開門",
+    "fingerprint": "指紋開門",
+    "fpandpw": "指紋加密碼開門",
+    "fporcard": "指紋或刷卡開門",
+    "fpandcard": "指紋加刷卡開門",
+    "fpandcardandpw": "指紋加刷卡加密碼開門",
+    "face": "人臉開門",
+    "faceandfp": "人臉加指紋開門",
+    "faceandpw": "人臉加密碼開門",
+    "faceandcard": "人臉加刷卡開門",
+    "faceorfp": "人臉或指紋開門",
+    "faceorcard": "人臉或刷卡開門",
+    "cardorface": "刷卡或人臉開門",
+    "faceandfpandcard": "人臉加指紋加刷卡開門",
+    "faceandpwandfp": "人臉加密碼加指紋開門",
+    "faceorfp orcard": "人臉、指紋或刷卡開門",
+    "faceorfp orcardorpw": "人臉、指紋、刷卡或密碼開門",
+    "employeenoandpw": "工號加密碼開門",
+    "employeenoandfp": "工號加指紋開門",
+    "employeenoandface": "工號加人臉開門",
+    "employeenoandfpandpw": "工號加指紋加密碼開門",
+    "employeenoandfaceandpw": "工號加人臉加密碼開門",
+    "remoteopen": "遠程開門",
+    "button": "開門按鈕",
+}
+
+# 只表示門鎖狀態，沒有說明用什麼認證。有認證模式時改用認證模式。
+_GENERIC_SUB_EVENTS = {21, 22, 25, 26}
+
+
+def door_info(raw_text: str) -> dict[str, str]:
+    empty = {"open_method": "", "person_name": "", "employee_no": "", "door_no": "", "card_no": ""}
+    if not raw_text.strip():
+        return empty
+    fields = _fields_from_text(raw_text)
+    if not _is_access(fields):
+        return empty
+    sub_code = _sub_code(fields)
+    verify = _verify_label(_pick(fields, "currentVerifyMode", "verifyMode", "currentVerifyModeString"))
+    method = ""
+    if sub_code in _SUB_EVENT_LABELS and sub_code not in _GENERIC_SUB_EVENTS:
+        method = _SUB_EVENT_LABELS[sub_code]
+    elif verify:
+        method = verify
+    elif sub_code in _SUB_EVENT_LABELS:
+        method = _SUB_EVENT_LABELS[sub_code]
+    return {
+        "open_method": method,
+        "person_name": _clip(_pick(fields, "name", "personName", "employeeName"), 80),
+        "employee_no": _clip(_pick(fields, "employeeNoString", "employeeNo", "employeeNoStr"), 40),
+        "door_no": _clip(_pick(fields, "doorNo", "doorID", "doorId"), 20),
+        "card_no": _clip(_pick(fields, "cardNo", "cardNumber"), 40),
+    }
+
+
+def _is_access(fields: dict[str, str]) -> bool:
+    event_type = _pick(fields, "eventType", "event_type").lower().replace("_", "")
+    major = _pick(fields, "majorEventType", "major").strip().lower()
+    return event_type == "accesscontrollerevent" or major in {"5", "0x5"}
+
+
+def _sub_code(fields: dict[str, str]) -> int | None:
+    raw = _pick(fields, "subEventType", "sub_event_type", "minor")
+    if not raw:
+        return None
+    text = raw.strip().lower()
+    try:
+        if text.startswith("0x"):
+            return int(text, 16)
+        return int(float(text))
+    except ValueError:
+        return None
+
+
+def _verify_label(mode: str) -> str:
+    if not mode:
+        return ""
+    key = re.sub(r"[\s_\-]", "", mode).lower()
+    return _VERIFY_LABELS.get(key, "")
+
+
 def parse_dt(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -122,11 +261,16 @@ def full_text(value: datetime | None) -> str:
 def parse_payload(content_type: str, body: bytes) -> ParsedEvent:
     text = ""
     images: list[tuple[str, bytes]] = []
+    face_image: tuple[str, bytes] | None = None
     if content_type.lower().startswith("multipart/"):
-        for _headers, data in _split_multipart(content_type, body):
+        for headers, data in _split_multipart(content_type, body):
             image = _image_ext(data)
             if image:
-                images.append((image, data))
+                item = (image, data)
+                if _is_face_part(headers):
+                    face_image = item
+                elif not images:
+                    images.append(item)
                 continue
             part_text = _decode(data).strip()
             if not part_text:
@@ -159,7 +303,7 @@ def parse_payload(content_type: str, body: bytes) -> ParsedEvent:
         channel_name=_clip(_pick(fields, "channelName", "cameraName", "channel_name"), 120),
         device_ip=_clip(_pick(fields, "ipAddress", "ip", "deviceIP"), 80),
         raw_text=text,
-        images=images[:1],
+        images=[face_image] if face_image else images[:1],
     )
 
 
@@ -184,6 +328,11 @@ def _decode(data: bytes) -> str:
         except UnicodeDecodeError:
             continue
     return data.decode("utf-8", "replace")
+
+
+def _is_face_part(headers: str) -> bool:
+    text = headers.lower()
+    return "face" in text or "human" in text or "人臉" in text
 
 
 def _image_ext(data: bytes) -> str | None:

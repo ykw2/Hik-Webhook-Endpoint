@@ -37,7 +37,7 @@
 
 <form class="filters" method="get" action="/events">
   <input type="hidden" name="status" value="{{ status }}">
-  <input type="search" name="q" value="{{ q }}" placeholder="搜尋通道、類型、IP" maxlength="100">
+  <input type="search" name="q" value="{{ q }}" placeholder="搜尋姓名、開門方式、通道、IP" maxlength="100">
   <button class="btn" type="submit">搜尋</button>
 </form>
 
@@ -56,18 +56,25 @@
     <b>{{ event.clock }}</b>
     <small>{{ event.day }}</small>
   </div>
-  <div>
-    <strong class="type">{{ event.type_label }}</strong>
-    {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
-    <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
-    {% if event.has_image %}<span class="pic">有圖片</span>{% endif %}
-    <p class="meta">
-      {% if event.channel_id %}通道 {{ event.channel_id }}{% endif %}
-      {% if event.channel_name %}{% if event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
-      {% if event.state_label %}{% if event.channel_id or event.channel_name %} · {% endif %}{{ event.state_label }}{% endif %}
-      {% if event.device_ip %}{% if event.channel_id or event.channel_name or event.state_label %} · {% endif %}{{ event.device_ip }}{% endif %}
-    </p>
-    {% if event.description %}<p class="desc">{{ event.description }}</p>{% endif %}
+  <div class="event-main">
+    {% if event.has_image %}
+    <a href="/events/{{ event.id }}"><img class="thumb" src="/events/{{ event.id }}/image" alt="人臉圖片"></a>
+    {% endif %}
+    <div>
+      <strong class="type">{{ event.type_label }}</strong>
+      {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
+      <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
+      <p class="meta">
+        {% if event.person_name %}{{ event.person_name }}{% endif %}
+        {% if event.employee_no %}{% if event.person_name %} · {% endif %}工號 {{ event.employee_no }}{% endif %}
+        {% if event.door_no %}{% if event.person_name or event.employee_no %} · {% endif %}門 {{ event.door_no }}{% endif %}
+        {% if event.card_no %}{% if event.person_name or event.employee_no or event.door_no %} · {% endif %}卡 {{ event.card_no }}{% endif %}
+        {% if event.channel_id %}{% if event.person_name or event.employee_no or event.door_no or event.card_no %} · {% endif %}通道 {{ event.channel_id }}{% endif %}
+        {% if event.channel_name %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.channel_id %} · {% endif %}{{ event.channel_name }}{% endif %}
+        {% if event.device_ip %}{% if event.person_name or event.employee_no or event.door_no or event.card_no or event.channel_id or event.channel_name %} · {% endif %}{{ event.device_ip }}{% endif %}
+      </p>
+      {% if event.description %}<p class="desc">{{ event.description }}</p>{% endif %}
+    </div>
   </div>
   <div class="actions">
     <a class="btn small" href="/events/{{ event.id }}">查看</a>
