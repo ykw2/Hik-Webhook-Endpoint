@@ -101,8 +101,8 @@
       .join("");
   }
 
-  async function tick() {
-    if (document.hidden) return;
+  async function tick(force) {
+    if (document.hidden && !force) return;
     try {
       var liveUrl = new URL("/live", location.origin);
       var currentQuery = new URL(location.href).searchParams.get("q");
@@ -124,8 +124,8 @@
       });
       var clearForm = document.getElementById("clear-events");
       if (clearForm && data.stats) clearForm.hidden = !data.stats.total;
-      if (Number(data.latest_id) !== latest) {
-        if (document.activeElement && document.activeElement.closest("form.filters")) return;
+      if (force || Number(data.latest_id) !== latest) {
+        if (!force && document.activeElement && document.activeElement.closest("form.filters")) return;
         var url = new URL("/events/feed", location.origin);
         var current = new URL(location.href);
         ["q", "status", "page"].forEach(function (key) {
@@ -141,6 +141,13 @@
     } catch (err) {
       return;
     }
+  }
+
+  var refreshBtn = document.getElementById("refresh-page");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", function () {
+      tick(true);
+    });
   }
 
   setInterval(tick, 2000);

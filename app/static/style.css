@@ -63,23 +63,35 @@ a { color: var(--accent-dark); }
   border-radius: 10px;
 }
 
-.device-title {
+.device-bar {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 0.7rem 1.3rem 0.15rem;
+  padding: 0.85rem 1.3rem 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.85rem;
 }
 
-.device-title h2 {
+.device-bar h2 {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   margin: 0;
+  flex: 0 0 auto;
 }
 
-.device-strip {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 0.85rem 1.3rem 0;
+.device-bar .device-grid {
+  flex: 1 1 16rem;
+}
+
+button.btn.refresh {
+  margin-left: auto;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.38rem 0.75rem;
+  font-size: 0.92rem;
 }
 
 .hint-tip {

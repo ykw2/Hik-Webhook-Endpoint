@@ -1,17 +1,13 @@
 {% extends "base.html" %}
 {% block title %}事件 · 海康接收{% endblock %}
-{% block lead %}
-<div class="device-title" id="devices">
+{% block under %}
+<section class="device-bar" id="devices">
   <h2>裝置連線
     <span class="hint-tip">
       <button type="button" class="hint-i" aria-label="裝置連線說明">i</button>
       <span class="hint-pop" role="tooltip">收到心跳會自動加入，綠色代表已連線。超過 {{ stale_seconds }} 秒沒有連線會變紅，紅色可以手動移除。</span>
     </span>
   </h2>
-</div>
-{% endblock %}
-{% block under %}
-<section class="device-strip">
   <div class="device-grid" id="device-grid">
     {% if devices %}
     {% for device in devices %}
@@ -39,6 +35,7 @@
     <p class="empty device-empty">未收到任何裝置心跳。</p>
     {% endif %}
   </div>
+  <button type="button" class="btn small refresh" id="refresh-page">重新整理</button>
 </section>
 {% endblock %}
 {% block content %}
@@ -70,5 +67,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/live.js"></script>
+<script src="/static/live.js?v=2"></script>
 {% endblock %}
