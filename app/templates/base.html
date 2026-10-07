@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}海康事件{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css?v=6">
+  <link rel="stylesheet" href="/static/style.css?v=7">
   {% if authed %}<meta name="csrf" content="{{ csrf }}">{% endif %}
 </head>
 <body>
   {% block lead %}{% endblock %}
   {% if authed %}
   <header class="top">
+    <a class="brand" href="/events" aria-label="承">
+      <span class="mark">承</span>
+    </a>
     <nav>
       <a href="/events">事件</a>
       <a class="manage" href="/manage">管理</a>
