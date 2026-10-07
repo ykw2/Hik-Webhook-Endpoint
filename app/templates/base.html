@@ -5,30 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}海康事件{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css?v=5">
+  <link rel="stylesheet" href="/static/style.css?v=6">
   {% if authed %}<meta name="csrf" content="{{ csrf }}">{% endif %}
 </head>
 <body>
   {% block lead %}{% endblock %}
+  {% if authed %}
   <header class="top">
-    <a class="brand" href="/">
-      <span class="mark">承</span>
-      <span>
-        <strong>海康接收</strong>
-        <small>Webhook</small>
-      </span>
-    </a>
-    {% if authed %}
     <nav>
       <a href="/events">事件</a>
-      <a href="/password">更改密碼</a>
+      <a class="manage" href="/manage">管理</a>
       <form class="inline" method="post" action="/logout">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="link" type="submit">登出</button>
       </form>
     </nav>
-    {% endif %}
   </header>
+  {% endif %}
   <div class="stripe"></div>
   {% block under %}{% endblock %}
   <main>

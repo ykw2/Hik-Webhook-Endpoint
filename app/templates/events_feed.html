@@ -18,7 +18,7 @@
     <a href="/events/{{ event.id }}"><img class="thumb" src="/events/{{ event.id }}/image" alt="人臉圖片"></a>
     {% endif %}
     <div>
-      <strong class="type">{{ event.type_label }}</strong>
+      <strong class="type{% if event.failed_face %} fail{% endif %}">{{ event.type_label }}</strong>
       {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
       <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
       <p class="meta">

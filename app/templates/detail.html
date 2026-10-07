@@ -3,7 +3,7 @@
 {% block content %}
 {% if flash %}<p class="flash{% if flash_bad %} bad{% endif %}">{{ flash }}</p>{% endif %}
 <p><a href="/events">返回列表</a></p>
-<h1>{{ event.type_label }}</h1>
+<h1{% if event.failed_face %} class="fail"{% endif %}>{{ event.type_label }}</h1>
 <p>
   <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
   {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}

@@ -182,6 +182,7 @@ def view_event(row: dict) -> dict:
         "received": full_text(received),
         "happened": full_text(happened) if happened else happened_raw,
         "type_label": label,
+        "failed_face": label == "人臉認證失敗",
         "type_code": "" if access["open_method"] or quiet else code,
         "open_method": access["open_method"] or quiet,
         "person_name": access["person_name"],
@@ -550,12 +551,20 @@ async def events_clear(request: Request):
     return RedirectResponse("/events?m=cleared", status_code=303)
 
 
-@app.get("/password")
-def password_form(request: Request):
+@app.get("/manage")
+def manage(request: Request):
     denied = guard(request)
     if denied:
         return denied
     return render(request, "password.html")
+
+
+@app.get("/password")
+def password_form(request: Request):
+    target = "/manage"
+    if request.url.query:
+        target = f"/manage?{request.url.query}"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/password")
@@ -565,21 +574,21 @@ async def password_change(request: Request):
         return denied
     form = await form_values(request)
     if not csrf_ok(request, form.get("csrf", "")):
-        return RedirectResponse("/password?m=csrf", status_code=303)
+        return RedirectResponse("/manage?m=csrf", status_code=303)
     current = form.get("current", "").strip()
     new = form.get("new", "").strip()
     again = form.get("again", "").strip()
     stored = db.admin_hash()
     if not stored or len(current) > 128 or not verify_password(current, stored):
-        return RedirectResponse("/password?m=wrong", status_code=303)
+        return RedirectResponse("/manage?m=wrong", status_code=303)
     if new != again:
-        return RedirectResponse("/password?m=mismatch", status_code=303)
+        return RedirectResponse("/manage?m=mismatch", status_code=303)
     problem = password_problem(new)
     if problem:
-        return RedirectResponse(f"/password?m={problem}", status_code=303)
+        return RedirectResponse(f"/manage?m={problem}", status_code=303)
     db.set_admin_hash(hash_password(new))
     discard_initial_password_file()
-    return RedirectResponse("/events?m=saved", status_code=303)
+    return RedirectResponse("/manage?m=saved", status_code=303)
 
 
 @app.exception_handler(404)

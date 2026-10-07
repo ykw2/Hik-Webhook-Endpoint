@@ -34,7 +34,7 @@ a { color: var(--accent-dark); }
 
 .top {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 1rem;
   padding: 0.9rem 1.3rem;
@@ -154,6 +154,12 @@ button.hint-i:hover {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.top nav a.manage {
+  margin-left: 0.15rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--line);
 }
 
 .top a,
@@ -493,6 +499,8 @@ button:hover,
   border-radius: 14px;
 }
 .type { font-size: 1.12rem; }
+.type.fail,
+h1.fail { color: var(--accent); }
 .meta, .count { margin: 0.15rem 0 0.7rem; color: var(--muted); }
 .desc { margin: 0.2rem 0 0; }
 .pic { color: var(--accent); font-weight: 800; font-size: 0.85rem; }
