@@ -551,12 +551,37 @@ async def events_clear(request: Request):
     return RedirectResponse("/events?m=cleared", status_code=303)
 
 
+def format_bytes(size: int) -> str:
+    value = float(max(0, size))
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{int(size)} B"
+
+
 @app.get("/manage")
 def manage(request: Request):
     denied = guard(request)
     if denied:
         return denied
-    return render(request, "password.html")
+    table = request.query_params.get("table", "events")
+    try:
+        dbpage = int(request.query_params.get("dbpage", "1"))
+    except ValueError:
+        dbpage = 1
+    report = db.storage_report()
+    browse = db.browse_table(table, dbpage)
+    storage = {key: format_bytes(value) for key, value in report.items()}
+    return render(
+        request,
+        "password.html",
+        storage=storage,
+        counts=db.browse_counts(),
+        browse=browse,
+    )
 
 
 @app.get("/password")

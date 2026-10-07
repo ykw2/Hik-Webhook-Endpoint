@@ -402,7 +402,44 @@ button:hover,
   word-break: break-all;
 }
 
-.hint { margin: 0.35rem 0 0; color: var(--muted); }
+.hint { margin: 0.35rem 0 0.9rem; color: var(--muted); }
+
+.sql-wrap {
+  overflow: auto;
+  max-height: 32rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.sql {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.86rem;
+}
+
+.sql th,
+.sql td {
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  max-width: 16rem;
+  word-break: break-word;
+}
+
+.sql th {
+  position: sticky;
+  top: 0;
+  background: #f7f9fc;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sql-wrap .empty { margin: 0; }
 
 .stats {
   display: grid;

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import shutil
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Iterator
 
 from app.config import DATA_DIR, DB_PATH, HK, IMAGE_DIR, MAX_ATTEMPTS
@@ -128,6 +130,88 @@ def init() -> None:
             )
             """
         )
+
+
+BROWSE_TABLES = ("events", "devices")
+BROWSE_PAGE = 20
+_CELL_LIMIT = 160
+
+
+def _path_size(path: Path) -> int:
+    try:
+        return path.stat().st_size if path.is_file() else 0
+    except OSError:
+        return 0
+
+
+def _tree_size(path: Path) -> int:
+    if not path.exists():
+        return 0
+    total = 0
+    for item in path.rglob("*"):
+        total += _path_size(item)
+    return total
+
+
+def storage_report() -> dict[str, int]:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    database = (
+        _path_size(DB_PATH)
+        + _path_size(DB_PATH.with_name(DB_PATH.name + "-wal"))
+        + _path_size(DB_PATH.with_name(DB_PATH.name + "-shm"))
+    )
+    images = _tree_size(IMAGE_DIR)
+    data = _tree_size(DATA_DIR)
+    disk = shutil.disk_usage(DATA_DIR)
+    return {
+        "database": database,
+        "images": images,
+        "data": data,
+        "other": max(0, data - database - images),
+        "disk_total": disk.total,
+        "disk_used": disk.used,
+        "disk_free": disk.free,
+    }
+
+
+def browse_counts() -> dict[str, int]:
+    counts = {name: 0 for name in BROWSE_TABLES}
+    with connect() as conn:
+        for name in BROWSE_TABLES:
+            row = conn.execute(f"SELECT COUNT(*) AS n FROM {name}").fetchone()
+            counts[name] = int(row["n"])
+    return counts
+
+
+def browse_table(name: str, page: int, page_size: int = BROWSE_PAGE) -> dict:
+    chosen = name if name in BROWSE_TABLES else BROWSE_TABLES[0]
+    page = max(1, page)
+    with connect() as conn:
+        total = int(conn.execute(f"SELECT COUNT(*) AS n FROM {chosen}").fetchone()["n"])
+        pages = max(1, (total + page_size - 1) // page_size)
+        page = min(page, pages)
+        columns = [row["name"] for row in conn.execute(f"PRAGMA table_info({chosen})")]
+        found = conn.execute(
+            f"SELECT * FROM {chosen} ORDER BY id DESC LIMIT ? OFFSET ?",
+            (page_size, (page - 1) * page_size),
+        ).fetchall()
+    rows: list[list[str]] = []
+    for found_row in found:
+        cells: list[str] = []
+        for column in columns:
+            text = "" if found_row[column] is None else str(found_row[column])
+            if len(text) > _CELL_LIMIT:
+                text = text[:_CELL_LIMIT] + "…"
+            cells.append(text)
+        rows.append(cells)
+    return {
+        "name": chosen,
+        "columns": columns,
+        "rows": rows,
+        "total": total,
+        "page": page,
+        "pages": pages,
+    }
 
 
 def admin_hash() -> str | None:
