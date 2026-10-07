@@ -56,9 +56,66 @@ a { color: var(--accent-dark); }
   background: var(--accent);
   color: white;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 0.4rem 0.55rem;
+  letter-spacing: 0;
+  min-width: 2.15rem;
+  text-align: center;
+  padding: 0.35rem 0.45rem;
   border-radius: 10px;
+}
+
+.lead {
+  max-width: 1080px;
+  margin: 0.85rem auto 0;
+  padding: 0 1.3rem;
+}
+
+.panel-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hint-tip {
+  position: relative;
+  display: inline-flex;
+}
+
+.hint-i {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #c5d0de;
+  background: #f7f9fc;
+  color: var(--muted);
+  font: italic 700 0.72rem/1 "Georgia", "Times New Roman", serif;
+  cursor: help;
+}
+
+.hint-pop {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.45rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 18rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  box-shadow: var(--shadow);
+}
+
+.hint-tip:hover .hint-pop,
+.hint-tip:focus-within .hint-pop {
+  display: block;
 }
 
 .brand strong { display: block; font-size: 1.1rem; }

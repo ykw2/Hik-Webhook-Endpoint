@@ -9,9 +9,10 @@
   {% if authed %}<meta name="csrf" content="{{ csrf }}">{% endif %}
 </head>
 <body>
+  {% block lead %}{% endblock %}
   <header class="top">
     <a class="brand" href="/">
-      <span class="mark">事件</span>
+      <span class="mark">承</span>
       <span>
         <strong>海康接收</strong>
         <small>Webhook</small>

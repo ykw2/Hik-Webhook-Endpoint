@@ -7,12 +7,5 @@
   <label for="password">密碼</label>
   <input id="password" name="password" type="password" required maxlength="128" autocomplete="current-password" spellcheck="false">
   <button type="submit">登入</button>
-  <details>
-    <summary>首次密碼在哪裡？</summary>
-    <p>第一次啟動會產生一組複雜密碼，只顯示一次。</p>
-    <p>看 <code>docker compose logs</code>，或打開 <code>data/initial-password.txt</code>。檔案第一行就是密碼。</p>
-    <p>登入後可以改成至少 6 個字元的新密碼。更改後，那個檔案會刪除。</p>
-    <p>如果忘記密碼：停止容器，刪除整個 <code>data</code> 資料夾，再啟動。系統會產生新密碼，已接收的事件會一併清掉。</p>
-  </details>
 </form>
 {% endblock %}
