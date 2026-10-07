@@ -567,25 +567,13 @@ def manage(request: Request):
     denied = guard(request)
     if denied:
         return denied
-    table = request.query_params.get("table", "events")
-    view = request.query_params.get("view", "")
-    if view != "schema":
-        view = "rows"
-    try:
-        dbpage = int(request.query_params.get("dbpage", "1"))
-    except ValueError:
-        dbpage = 1
     report = db.storage_report()
-    browse = db.browse_table(table, dbpage)
     storage = {key: format_bytes(value) for key, value in report.items()}
     return render(
         request,
         "password.html",
         storage=storage,
-        counts=db.browse_counts(),
-        browse=browse,
-        view=view,
-        schema=db.schema_report() if view == "schema" else [],
+        schema=db.schema_report(),
     )
 
 
