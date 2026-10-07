@@ -174,6 +174,59 @@ def storage_report() -> dict[str, int]:
     }
 
 
+def _safe_name(name: str) -> str:
+    if name and name.replace("_", "").isalnum() and not name[0].isdigit():
+        return name
+    raise ValueError(name)
+
+
+def schema_report() -> list[dict]:
+    tables: list[dict] = []
+    with connect() as conn:
+        found = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            ORDER BY name
+            """
+        ).fetchall()
+        for item in found:
+            name = _safe_name(item["name"])
+            columns = []
+            for column in conn.execute(f"PRAGMA table_info({name})"):
+                flags: list[str] = []
+                if column["pk"]:
+                    flags.append("主鍵")
+                if column["notnull"]:
+                    flags.append("必填")
+                if column["dflt_value"] is not None:
+                    flags.append(f"預設 {column['dflt_value']}")
+                columns.append(
+                    {
+                        "name": column["name"],
+                        "type": column["type"] or "",
+                        "flags": "、".join(flags),
+                    }
+                )
+            indexes = []
+            for index in conn.execute(f"PRAGMA index_list({name})"):
+                index_name = _safe_name(index["name"])
+                fields = [
+                    row["name"]
+                    for row in conn.execute(f"PRAGMA index_info({index_name})")
+                    if row["name"]
+                ]
+                indexes.append(
+                    {
+                        "name": index_name,
+                        "unique": bool(index["unique"]),
+                        "columns": "、".join(fields),
+                    }
+                )
+            tables.append({"name": name, "columns": columns, "indexes": indexes})
+    return tables
+
+
 def browse_counts() -> dict[str, int]:
     counts = {name: 0 for name in BROWSE_TABLES}
     with connect() as conn:

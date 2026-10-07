@@ -441,6 +441,10 @@ button:hover,
 
 .sql-wrap .empty { margin: 0; }
 
+.schema { margin-bottom: 1.1rem; }
+.schema h2 { margin-bottom: 0.45rem; }
+.schema .hint { margin-top: 0.35rem; }
+
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
