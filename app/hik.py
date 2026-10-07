@@ -87,11 +87,40 @@ def state_label(state: str) -> str:
     return STATE_LABELS.get(state.lower(), state)
 
 
-FACE_CODES = {75, 38, 76, 112, 113}
-CARD_CODES = {1, 39, 16, 17}
-FINGER_CODES = {2, 3, 18}
+CODE_LABELS = {
+    1: "刷卡通行",
+    2: "指紋辨識通行",
+    3: "指紋辨識通行",
+    6: "未分配權限",
+    7: "無效時段",
+    8: "卡號過期",
+    9: "無此卡號",
+    16: "刷卡通行",
+    17: "刷卡通行",
+    18: "指紋辨識通行",
+    25: "門狀態事件",
+    38: "人臉辨識通行",
+    39: "刷卡通行",
+    75: "人臉辨識通行",
+    76: "人臉認證失敗",
+    112: "人臉辨識通行",
+    113: "人臉辨識通行",
+    1024: "中心平台開鎖",
+}
 HEARTBEAT_MINOR = 77
 LOCK_CODES = {21, 22}
+STATUS_BY_CODE = {
+    1028: "裝置已遭撬動",
+    1029: "NTP自動對時",
+    1031: "網路恢復",
+}
+STATUS_BY_MAJOR = {
+    (1, 1028): "裝置已遭撬動",
+    (2, 39): "網路已斷線",
+    (2, 1031): "網路恢復",
+    (3, 112): "遠程登入",
+    (3, 1029): "NTP自動對時",
+}
 
 
 def is_heartbeat(event_type: str) -> bool:
@@ -112,12 +141,13 @@ def is_ignored_event(event_type: str, raw_text: str) -> bool:
 def quiet_label(event_type: str, raw_text: str) -> str:
     if is_heartbeat_signal(event_type, raw_text):
         return "心跳"
-    code = _sub_code(_access_fields(raw_text))
+    fields = _access_fields(raw_text)
+    code = _sub_code(fields)
     if code == 21:
         return "門鎖打開"
     if code == 22:
         return "門鎖關閉"
-    return ""
+    return _status_label(fields)
 
 
 def heartbeat_device(raw_text: str, source_ip: str) -> dict[str, str] | None:
@@ -158,7 +188,7 @@ def door_info(raw_text: str) -> dict[str, str]:
     fields = _access_fields(raw_text)
     if not _is_access(fields) or is_heartbeat(_pick(fields, "eventType")):
         return empty
-    if _sub_code(fields) in {HEARTBEAT_MINOR, *LOCK_CODES}:
+    if _sub_code(fields) in {HEARTBEAT_MINOR, *LOCK_CODES} or _status_label(fields):
         return empty
     person = _clip(_pick(fields, "name", "personName", "employeeName"), 80)
     employee = _clip(_pick(fields, "employeeNoString", "employeeNo", "employeeNoStr"), 40)
@@ -182,7 +212,14 @@ def _is_access(fields: dict[str, str]) -> bool:
 
 
 def _sub_code(fields: dict[str, str]) -> int | None:
-    raw = _pick(fields, "subEventType", "sub_event_type", "minor")
+    return _parse_code(_pick(fields, "subEventType", "sub_event_type", "minor"))
+
+
+def _major_code(fields: dict[str, str]) -> int | None:
+    return _parse_code(_pick(fields, "majorEventType", "major"))
+
+
+def _parse_code(raw: str) -> int | None:
     if not raw:
         return None
     text = raw.strip().lower()
@@ -194,15 +231,25 @@ def _sub_code(fields: dict[str, str]) -> int | None:
         return None
 
 
+def _status_label(fields: dict[str, str]) -> str:
+    code = _sub_code(fields)
+    major = _major_code(fields)
+    if major is not None and code is not None:
+        labeled = STATUS_BY_MAJOR.get((major, code))
+        if labeled:
+            return labeled
+    if code in STATUS_BY_CODE:
+        return STATUS_BY_CODE[code]
+    return ""
+
+
 def _verification_label(fields: dict[str, str]) -> str:
     code = _sub_code(fields)
-    if code in FACE_CODES:
-        return "人臉辨識通行"
-    if code in CARD_CODES:
-        return "刷卡通行"
-    if code in FINGER_CODES:
-        return "指紋辨識通行"
+    if code in CODE_LABELS:
+        return CODE_LABELS[code]
     description = _pick(fields, "eventDescription", "label", "minorEventDesc").lower()
+    if any(word in description for word in ("失敗", "失败", "未分配", "過期", "过期", "無效", "无效")):
+        return "認證失敗"
     if "face" in description or "人臉" in description or "人脸" in description:
         return "人臉辨識通行"
     if "card" in description or "刷卡" in description:
