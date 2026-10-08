@@ -458,6 +458,8 @@ button:hover,
   align-items: center;
   gap: 0.35rem;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
 }
 
@@ -689,6 +691,21 @@ a.btn.back {
 .detail .facts dt { font-size: 0.75rem; line-height: 1.2; }
 .detail .facts dd { margin: 0; font-size: 0.95rem; line-height: 1.25; word-break: break-word; }
 .detail h2 { margin: 0.55rem 0 0.25rem; }
+.raw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0.55rem 0 0.25rem;
+}
+.raw-head h2 { margin: 0; }
+button.copy-raw {
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.32rem 0.75rem;
+  font-size: 0.92rem;
+}
 .detail p { margin: 0.15rem 0 0.35rem; }
 .detail pre.raw {
   margin: 0;
@@ -741,7 +758,12 @@ summary { cursor: pointer; font-weight: 700; color: var(--ink); }
   .event { grid-template-columns: 1fr; }
   .facts { grid-template-columns: 1fr; }
   .filters { flex-direction: column; align-items: stretch; }
-  .filters input[type="datetime-local"],
+  .filters input[type="datetime-local"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+  }
   .filters input[type="search"] { width: 100%; min-width: 0; flex: none; }
   .filters label.range { width: 100%; }
   .detail .facts { grid-template-columns: 1fr 1fr; }
