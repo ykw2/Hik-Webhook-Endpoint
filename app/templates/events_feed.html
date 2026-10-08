@@ -15,7 +15,7 @@
   </div>
   <div class="event-main">
     {% if event.has_image %}
-    <a href="/events/{{ event.id }}"><img class="thumb" src="/events/{{ event.id }}/image" alt="人臉圖片"></a>
+    <img class="thumb zoomable" src="/events/{{ event.id }}/image" alt="人臉圖片">
     {% endif %}
     <div>
       <strong class="type{% if event.failed_face %} fail{% endif %}">{{ event.type_label }}</strong>
@@ -35,7 +35,7 @@
     </div>
   </div>
   <div class="actions">
-    <a class="btn small" href="/events/{{ event.id }}">查看</a>
+    <a class="btn small" href="/events/{{ event.id }}{% if list_query %}?{{ list_query }}{% endif %}">查看</a>
     <form method="post" action="/events/{{ event.id }}/delete" onsubmit="return confirm('刪除這個事件？');">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="btn small danger" type="submit">刪除</button>
@@ -45,9 +45,32 @@
 {% endfor %}
 {% if pages > 1 %}
 <nav class="pager">
-  {% if page > 1 %}<a href="/events?page={{ page - 1 }}&status={{ status }}&q={{ q|urlencode }}">上一頁</a>{% endif %}
-  <span>{{ page }} / {{ pages }}</span>
-  {% if page < pages %}<a href="/events?page={{ page + 1 }}&status={{ status }}&q={{ q|urlencode }}">下一頁</a>{% endif %}
+  {% if page > 1 %}
+  <a href="/events?page=1{% if keep %}&{{ keep }}{% endif %}">第一頁</a>
+  <a href="/events?page={{ page - 1 }}{% if keep %}&{{ keep }}{% endif %}">上一頁</a>
+  {% else %}
+  <span class="off">第一頁</span>
+  <span class="off">上一頁</span>
+  {% endif %}
+  <form class="jump" method="get" action="/events">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="hidden" name="q" value="{{ q }}">
+    <input type="hidden" name="from" value="{{ from }}">
+    <input type="hidden" name="to" value="{{ to }}">
+    <label>第
+      <input type="number" name="page" min="1" max="{{ pages }}" value="{{ page }}" required>
+      頁
+    </label>
+    <button class="btn small" type="submit">前往</button>
+  </form>
+  <span class="off">共 {{ pages }} 頁 · {{ total }} 筆</span>
+  {% if page < pages %}
+  <a href="/events?page={{ page + 1 }}{% if keep %}&{{ keep }}{% endif %}">下一頁</a>
+  <a href="/events?page={{ pages }}{% if keep %}&{{ keep }}{% endif %}">最後一頁</a>
+  {% else %}
+  <span class="off">下一頁</span>
+  <span class="off">最後一頁</span>
+  {% endif %}
 </nav>
 {% endif %}
 {% endif %}

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import secrets
 import threading
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
@@ -395,21 +396,77 @@ def view_devices() -> list[dict]:
     return items
 
 
-def event_list_args(request: Request) -> dict:
+_CLOCK = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$")
+
+
+def range_bound(value: str, *, end: bool) -> tuple[str, str]:
+    text = (value or "").strip()[:16]
+    match = _CLOCK.fullmatch(text)
+    if not match:
+        return "", ""
+    try:
+        stamp = datetime(*(int(part) for part in match.groups()), tzinfo=HK)
+    except ValueError:
+        return "", ""
+    if end:
+        stamp += timedelta(minutes=1)
+    return text, stamp.isoformat(timespec="seconds")
+
+
+def event_window(request: Request) -> dict:
     query = request.query_params.get("q", "").strip()[:100]
     status = request.query_params.get("status", "")
     if status not in {"queued", "sent", "failed"}:
         status = ""
+    start_text, start = range_bound(request.query_params.get("from", ""), end=False)
+    end_text, end = range_bound(request.query_params.get("to", ""), end=True)
+    if start and end and start >= end:
+        start_text, end_text = end_text, start_text
+        start, end = range_bound(start_text, end=False)[1], range_bound(end_text, end=True)[1]
     try:
         page = int(request.query_params.get("page", "1"))
     except ValueError:
         page = 1
-    page = max(1, page)
-    total = db.count_events(query, status)
+    return {
+        "query": query,
+        "status": status,
+        "page": max(1, page),
+        "from": start_text,
+        "to": end_text,
+        "start": start,
+        "end": end,
+    }
+
+
+def list_links(window: dict, page: int) -> dict[str, str]:
+    search = [("q", window["query"]), ("from", window["from"]), ("to", window["to"])]
+    search_keep = urlencode([(key, value) for key, value in search if value])
+    kept = [("status", window["status"]), *search]
+    keep = urlencode([(key, value) for key, value in kept if value])
+    back_pairs = [(key, value) for key, value in kept if value]
+    if page > 1:
+        back_pairs.append(("page", str(page)))
+    return {
+        "search_keep": search_keep,
+        "keep": keep,
+        "list_query": urlencode(back_pairs),
+        "back": "/events" + ("?" + urlencode(back_pairs) if back_pairs else ""),
+    }
+
+
+def event_list_args(request: Request) -> dict:
+    window = event_window(request)
+    query = window["query"]
+    status = window["status"]
+    page = window["page"]
+    total = db.count_events(query, status, window["start"], window["end"])
     pages = max(1, math.ceil(total / PAGE_SIZE)) if total else 1
     if page > pages:
         page = pages
-    rows = [view_event(row) for row in db.list_events(query, status, page, PAGE_SIZE)]
+    rows = [
+        view_event(row)
+        for row in db.list_events(query, status, page, PAGE_SIZE, window["start"], window["end"])
+    ]
     numbers = db.stats()
     if numbers["total"] == 0:
         empty = "none"
@@ -425,7 +482,11 @@ def event_list_args(request: Request) -> dict:
         "pages": pages,
         "q": query,
         "status": status,
+        "from": window["from"],
+        "to": window["to"],
         "empty": empty,
+        "latest_id": db.latest_event_id(query, window["start"], window["end"]),
+        **list_links(window, page),
     }
 
 
@@ -434,12 +495,13 @@ def live(request: Request):
     if not request.session.get("auth"):
         return JSONResponse({"ok": False}, status_code=401)
     numbers = db.stats()
+    window = event_window(request)
     return JSONResponse(
         {
             "ok": True,
             "devices": view_devices(),
             "stats": numbers,
-            "latest_id": db.latest_event_id(request.query_params.get("q", "").strip()[:100]),
+            "latest_id": db.latest_event_id(window["query"], window["start"], window["end"]),
             "stale_seconds": HEARTBEAT_STALE_SECONDS,
         }
     )
@@ -450,12 +512,12 @@ def events(request: Request):
     denied = guard(request)
     if denied:
         return denied
+    args = event_list_args(request)
     return render(
         request,
         "events.html",
-        **event_list_args(request),
+        **args,
         devices=view_devices(),
-        latest_id=db.latest_event_id(request.query_params.get("q", "").strip()[:100]),
         stale_seconds=HEARTBEAT_STALE_SECONDS,
         webhook_url=str(request.base_url).rstrip("/") + "/",
     )
@@ -494,7 +556,13 @@ def event_detail(request: Request, event_id: int):
     row = db.get_event(event_id)
     if row is None:
         return RedirectResponse("/events?m=missing", status_code=303)
-    return render(request, "detail.html", event=view_event(row))
+    window = event_window(request)
+    return render(
+        request,
+        "detail.html",
+        event=view_event(row),
+        back=list_links(window, window["page"])["back"],
+    )
 
 
 @app.get("/events/{event_id}/image")

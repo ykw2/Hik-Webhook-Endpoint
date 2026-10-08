@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% block title %}{{ event.type_label }} · 承.事件{% endblock %}
 {% block content %}
+<div class="detail">
 {% if flash %}<p class="flash{% if flash_bad %} bad{% endif %}">{{ flash }}</p>{% endif %}
-<p><a href="/events">返回列表</a></p>
+<a class="btn back" href="{{ back }}">返回列表</a>
 <h1{% if event.failed_face %} class="fail"{% endif %}>{{ event.type_label }}</h1>
-<p>
+<p class="detail-status">
   <span class="pill {{ event.queue_status }}">{{ event.queue_label }}</span>
   {% if event.type_code and event.type_code != event.type_label %}<small>{{ event.type_code }}</small>{% endif %}
 </p>
 
 {% if event.has_image %}
-<img class="shot face" src="/events/{{ event.id }}/image" alt="人臉圖片">
+<img class="shot face zoomable" src="/events/{{ event.id }}/image" alt="人臉圖片">
 {% endif %}
 
 <dl class="facts">
@@ -55,5 +56,6 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="danger" type="submit">刪除</button>
   </form>
+</div>
 </div>
 {% endblock %}

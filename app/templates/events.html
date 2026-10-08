@@ -49,15 +49,21 @@
 </section>
 
 <nav class="tabs">
-  <a class="{% if not status %}on{% endif %}" href="/events?q={{ q|urlencode }}">全部</a>
-  <a class="{% if status == 'queued' %}on{% endif %}" href="/events?status=queued&q={{ q|urlencode }}">排隊中</a>
-  <a class="{% if status == 'sent' %}on{% endif %}" href="/events?status=sent&q={{ q|urlencode }}">已推送</a>
-  <a class="{% if status == 'failed' %}on{% endif %}" href="/events?status=failed&q={{ q|urlencode }}">推送失敗</a>
+  <a class="{% if not status %}on{% endif %}" href="/events{% if search_keep %}?{{ search_keep }}{% endif %}">全部</a>
+  <a class="{% if status == 'queued' %}on{% endif %}" href="/events?status=queued{% if search_keep %}&{{ search_keep }}{% endif %}">排隊中</a>
+  <a class="{% if status == 'sent' %}on{% endif %}" href="/events?status=sent{% if search_keep %}&{{ search_keep }}{% endif %}">已推送</a>
+  <a class="{% if status == 'failed' %}on{% endif %}" href="/events?status=failed{% if search_keep %}&{{ search_keep }}{% endif %}">推送失敗</a>
 </nav>
 
 <form class="filters" method="get" action="/events">
   <input type="hidden" name="status" value="{{ status }}">
-  <input type="search" name="q" value="{{ q }}" placeholder="搜尋姓名、開門方式、心跳、門鎖、通道、IP" maxlength="100">
+  <label class="range">由
+    <input type="datetime-local" name="from" step="60" value="{{ from }}">
+  </label>
+  <label class="range">至
+    <input type="datetime-local" name="to" step="60" value="{{ to }}">
+  </label>
+  <input type="search" name="q" value="{{ q }}" placeholder="事件、姓名、開門方式、心跳、門鎖、通道、IP" maxlength="100">
   <button class="btn" type="submit">搜尋</button>
 </form>
 <div id="feed" data-latest="{{ latest_id }}">
@@ -65,5 +71,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/live.js?v=2"></script>
+<script src="/static/live.js?v=3"></script>
 {% endblock %}

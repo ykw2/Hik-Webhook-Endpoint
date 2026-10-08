@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}承.事件{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css?v=11">
+  <link rel="stylesheet" href="/static/style.css?v=14">
   {% if authed %}<meta name="csrf" content="{{ csrf }}">{% endif %}
 </head>
 <body>
@@ -30,6 +30,33 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  <div id="zoom" hidden>
+    <img alt="">
+  </div>
+  <script>
+    (function () {
+      var layer = document.getElementById("zoom");
+      var full = layer.querySelector("img");
+      function closeZoom() {
+        layer.hidden = true;
+        full.removeAttribute("src");
+      }
+      document.addEventListener("click", function (event) {
+        if (!layer.hidden) {
+          closeZoom();
+          return;
+        }
+        var shot = event.target.closest("img.zoomable");
+        if (!shot) return;
+        full.src = shot.currentSrc || shot.src;
+        full.alt = shot.alt || "";
+        layer.hidden = false;
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !layer.hidden) closeZoom();
+      });
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

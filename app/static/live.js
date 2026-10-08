@@ -105,8 +105,11 @@
     if (document.hidden && !force) return;
     try {
       var liveUrl = new URL("/live", location.origin);
-      var currentQuery = new URL(location.href).searchParams.get("q");
-      if (currentQuery) liveUrl.searchParams.set("q", currentQuery);
+      var currentQuery = new URL(location.href).searchParams;
+      ["q", "from", "to"].forEach(function (key) {
+        var value = currentQuery.get(key);
+        if (value) liveUrl.searchParams.set(key, value);
+      });
       var res = await fetch(liveUrl, {
         headers: { Accept: "application/json" },
         cache: "no-store",
@@ -125,10 +128,10 @@
       var clearForm = document.getElementById("clear-events");
       if (clearForm && data.stats) clearForm.hidden = !data.stats.total;
       if (force || Number(data.latest_id) !== latest) {
-        if (!force && document.activeElement && document.activeElement.closest("form.filters")) return;
+        if (!force && document.activeElement && document.activeElement.closest("form.filters, form.jump")) return;
         var url = new URL("/events/feed", location.origin);
         var current = new URL(location.href);
-        ["q", "status", "page"].forEach(function (key) {
+        ["q", "status", "page", "from", "to"].forEach(function (key) {
           var value = current.searchParams.get(key);
           if (value) url.searchParams.set(key, value);
         });

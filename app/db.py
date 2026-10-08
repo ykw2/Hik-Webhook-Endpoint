@@ -192,7 +192,12 @@ def set_admin_hash(password_hash: str) -> None:
 _VISIBLE = "IFNULL(hidden, 0) = 0"
 
 
-def _filters(query: str, status: str) -> tuple[str, list[object]]:
+def _filters(
+    query: str,
+    status: str,
+    start: str = "",
+    end: str = "",
+) -> tuple[str, list[object]]:
     where: list[str] = []
     params: list[object] = []
     if not query:
@@ -200,6 +205,12 @@ def _filters(query: str, status: str) -> tuple[str, list[object]]:
     if status in {"queued", "sent", "failed"}:
         where.append("queue_status = ?")
         params.append(status)
+    if start:
+        where.append("received_at >= ?")
+        params.append(start)
+    if end:
+        where.append("received_at < ?")
+        params.append(end)
     if query:
         pattern = _like(query)
         where.append(
@@ -230,15 +241,22 @@ def _like(query: str) -> str:
     return f"%{escaped}%"
 
 
-def count_events(query: str, status: str) -> int:
-    clause, params = _filters(query, status)
+def count_events(query: str, status: str, start: str = "", end: str = "") -> int:
+    clause, params = _filters(query, status, start, end)
     with connect() as conn:
         row = conn.execute(f"SELECT COUNT(*) AS n FROM events{clause}", params).fetchone()
     return int(row["n"])
 
 
-def list_events(query: str, status: str, page: int, page_size: int) -> list[dict]:
-    clause, params = _filters(query, status)
+def list_events(
+    query: str,
+    status: str,
+    page: int,
+    page_size: int,
+    start: str = "",
+    end: str = "",
+) -> list[dict]:
+    clause, params = _filters(query, status, start, end)
     offset = (page - 1) * page_size
     with connect() as conn:
         rows = conn.execute(
@@ -380,8 +398,8 @@ def due_events(limit: int = 5) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def latest_event_id(query: str = "") -> int:
-    clause, params = _filters(query, "")
+def latest_event_id(query: str = "", start: str = "", end: str = "") -> int:
+    clause, params = _filters(query, "", start, end)
     with connect() as conn:
         row = conn.execute(
             f"SELECT MAX(id) AS n FROM events{clause}", params
