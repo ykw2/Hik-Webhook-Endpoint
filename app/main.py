@@ -569,12 +569,7 @@ def manage(request: Request):
         return denied
     report = db.storage_report()
     storage = {key: format_bytes(value) for key, value in report.items()}
-    return render(
-        request,
-        "password.html",
-        storage=storage,
-        schema=db.schema_report(),
-    )
+    return render(request, "password.html", storage=storage)
 
 
 @app.get("/password")
