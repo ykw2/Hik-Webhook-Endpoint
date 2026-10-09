@@ -109,6 +109,7 @@ CODE_LABELS = {
 HEARTBEAT_MINOR = 77
 LOCK_CODES = {21, 22}
 STATUS_BY_CODE = {
+    104: "即時臉部偵測失敗",
     1024: "中心平台開鎖",
     1028: "裝置已遭撬動",
     1029: "NTP自動對時",
